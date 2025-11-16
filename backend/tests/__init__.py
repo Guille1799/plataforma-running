@@ -1,0 +1,3 @@
+"""
+Tests para RunCoach Platform
+"""

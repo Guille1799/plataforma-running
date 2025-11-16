@@ -1,0 +1,51 @@
+# Production requirements (add to requirements.txt)
+
+# Core
+fastapi==0.121.1
+uvicorn==0.30.0
+python-dotenv==1.2.1
+
+# Database
+sqlalchemy==2.0.44
+psycopg2-binary==2.9.10  # PostgreSQL adapter
+alembic==1.13.0  # Database migrations
+
+# Authentication & Security
+python-jose==2.0.1
+passlib==1.7.4
+bcrypt==5.0.0
+email-validator==2.3.0
+
+# Data Validation
+pydantic==2.12.4
+pydantic-settings==2.0.3
+
+# API & Serialization
+pydantic-core==2.41.5
+
+# Cache & Jobs
+redis==5.0.1
+celery==5.4.0
+
+# FIT File Parsing
+fitparse==1.2.0
+
+# AI/LLM
+anthropic==0.32.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.23.2
+pytest-cov==4.1.0
+httpx==0.28.1
+
+# Code Quality
+black==24.1.0
+ruff==0.1.11
+mypy==1.7.0
+
+# Monitoring
+sentry-sdk==1.39.0
+
+# Type hints
+typing-extensions==4.15.0
