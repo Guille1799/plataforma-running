@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer
 
 from . import models
 from .database import engine
-from .routers import auth, workouts, garmin, profile, coach, strava, upload, training_plans, predictions, health, onboarding, integrations, events
+from .routers import auth, workouts, garmin, profile, coach, strava, upload, training_plans, predictions, health, onboarding, integrations, events, overtraining, hrv
 from .core.config import settings
 
 # Create database tables
@@ -44,6 +44,8 @@ app.include_router(coach.router, tags=["AI Coach"])
 app.include_router(training_plans.router, tags=["Training Plans"])
 app.include_router(predictions.router, tags=["Race Predictions"])
 app.include_router(health.router, tags=["Health Metrics"])
+app.include_router(overtraining.router, tags=["Overtraining Detection"])
+app.include_router(hrv.router, tags=["HRV Analysis"])
 app.include_router(events.router, tags=["Events"])
 
 
