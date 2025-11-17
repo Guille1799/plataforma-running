@@ -4,21 +4,43 @@ overtraining.py - Overtraining Detection Endpoints
 Exposes the overtraining detection algorithms through REST API.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database import get_db
-from app.models import User
-from app.security import get_current_user
+from app import models, crud
+from app.security import verify_token
+from app.core.config import settings
 from app.services.overtraining_detector_service import overtraining_detector
 
+
 router = APIRouter(prefix="/api/v1/overtraining", tags=["overtraining"])
+security_scheme = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db)
+) -> models.User:
+    """Extract current user from JWT token."""
+    token = credentials.credentials
+    payload = verify_token(token, settings.secret_key, settings.algorithm)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload.get("sub"))
+    user = crud.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user
 
 
 @router.get("/risk-assessment")
 def get_overtraining_risk(
     days: int = Query(30, ge=7, le=90, description="Days to analyze (7-90)"),
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -110,7 +132,7 @@ def get_overtraining_risk(
 
 @router.get("/recovery-status")
 def get_recovery_status(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -172,7 +194,7 @@ def get_recovery_status(
 
 @router.get("/daily-alert")
 def get_daily_alert(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """

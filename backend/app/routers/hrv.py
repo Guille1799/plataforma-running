@@ -4,20 +4,42 @@ hrv.py - Heart Rate Variability Analysis Endpoints
 Advanced HRV analytics endpoints for detailed fatigue assessment.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import User
-from app.security import get_current_user
+from app import models, crud
+from app.security import verify_token
+from app.core.config import settings
 from app.services.hrv_analysis_service import hrv_analysis_service
 
+
 router = APIRouter(prefix="/api/v1/hrv", tags=["hrv-analysis"])
+security_scheme = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
+    db: Session = Depends(get_db)
+) -> models.User:
+    """Extract current user from JWT token."""
+    token = credentials.credentials
+    payload = verify_token(token, settings.secret_key, settings.algorithm)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    
+    user_id = int(payload.get("sub"))
+    user = crud.get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user
 
 
 @router.get("/analysis")
 def analyze_hrv(
     days: int = Query(30, ge=7, le=90, description="Analysis period in days"),
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -130,7 +152,7 @@ def analyze_hrv(
 
 @router.get("/status")
 def get_hrv_status(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -201,7 +223,7 @@ def get_hrv_status(
 @router.get("/workout-correlation")
 def get_hrv_workout_correlation(
     days: int = Query(30, ge=7, le=90),
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -244,7 +266,7 @@ def get_hrv_workout_correlation(
 
 @router.get("/prediction")
 def get_hrv_prediction(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
