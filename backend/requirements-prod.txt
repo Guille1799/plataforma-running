@@ -36,6 +36,9 @@ celery==5.4.0
 # FIT File Parsing
 fitparse==1.2.0
 
+# GPX File Parsing
+gpxpy==1.6.2
+
 # Wearables/Garmin Integration
 garth==0.4.47
 garminconnect==0.2.24
