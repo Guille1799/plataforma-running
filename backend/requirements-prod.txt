@@ -5,6 +5,10 @@ fastapi==0.121.1
 uvicorn==0.30.0
 python-dotenv==1.2.1
 python-multipart==0.0.6
+httpx==0.28.1
+httptools==0.7.1
+requests==2.32.5
+requests-oauthlib==2.0.0
 
 # Database
 sqlalchemy==2.0.44
@@ -13,6 +17,7 @@ alembic==1.13.0  # Database migrations
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
+PyJWT==2.10.1
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 email-validator==2.3.0
@@ -30,6 +35,9 @@ celery==5.4.0
 
 # FIT File Parsing
 fitparse==1.2.0
+
+# Wearables/Garmin Integration
+garth==0.5.19
 
 # AI/LLM
 anthropic==0.32.0
