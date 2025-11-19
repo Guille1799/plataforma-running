@@ -38,6 +38,7 @@ fitparse==1.2.0
 
 # Wearables/Garmin Integration
 garth==0.5.19
+garminconnect==0.2.24
 
 # AI/LLM
 anthropic==0.32.0
