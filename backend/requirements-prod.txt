@@ -42,7 +42,7 @@ garminconnect==0.2.24
 
 # AI/LLM
 anthropic==0.32.0
-groq==0.4.2
+groq==0.9.0
 
 # Testing
 pytest==7.4.3
