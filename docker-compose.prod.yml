@@ -1,0 +1,115 @@
+version: '3.9'
+
+services:
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: runcoach_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:8000
+    depends_on:
+      - backend
+    networks:
+      - runcoach_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: runcoach_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://runcoach_user:runcoach_password@postgres:5432/runcoach_db
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - runcoach_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database (PostgreSQL)
+  postgres:
+    image: postgres:16-alpine
+    container_name: runcoach_postgres
+    environment:
+      POSTGRES_USER: runcoach_user
+      POSTGRES_PASSWORD: runcoach_password
+      POSTGRES_DB: runcoach_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - runcoach_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runcoach_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cache (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: runcoach_redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - runcoach_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Reverse Proxy (Nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: runcoach_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - runcoach_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  runcoach_network:
+    driver: bridge

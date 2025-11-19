@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 
@@ -229,3 +230,44 @@ def refresh_token_endpoint(
         refresh_token=new_refresh_token,
         user=UserOut.model_validate(db_user)
     )
+
+
+@router.get("/api/v1/auth/me", response_model=UserOut)
+def get_current_user_info(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    db: Session = Depends(get_db)
+) -> UserOut:
+    """Get current authenticated user information.
+    
+    Args:
+        credentials: Bearer token from Authorization header
+        db: Database session
+        
+    Returns:
+        Current user information
+    """
+    from .. import security
+    
+    # Extract token
+    token = credentials.credentials
+    
+    # Verify token
+    payload = security.verify_token(token, secret_key=settings.secret_key, algorithm=settings.algorithm)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+    
+    # Get user ID from token
+    user_id = int(payload.get("sub"))
+    
+    # Get user from database
+    db_user = crud.get_user_by_id(db, user_id=user_id)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+    
+    return UserOut.model_validate(db_user)

@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String, DateTime, Float, ForeignKey, JSON, Date, UniqueConstraint
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
 
@@ -91,6 +92,9 @@ class User(Base):
     devices_configured = Column(JSON, nullable=True, default=list)  # List of configured device IDs
     device_sync_config = Column(JSON, nullable=True, default=dict)  # {"garmin": {"enabled": true, "sync_interval_hours": 1, "last_sync": "2025-11-14T10:30:00", "auto_sync": true}, ...}
     device_sync_enabled = Column(Boolean, default=True, nullable=False)  # Master toggle for all syncing
+    
+    # Relationships
+    workouts = relationship("Workout", back_populates="user", cascade="all, delete-orphan")
 
 
 
@@ -151,6 +155,9 @@ class Workout(Base):
     
     file_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="workouts")
 
 
 class ChatMessage(Base):
