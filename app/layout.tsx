@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { CoachChat } from "./components/coach-chat";
+// import { CoachChat } from "./components/coach-chat";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -19,7 +19,7 @@ export default function RootLayout({
       <body>
         <Providers>
           {children}
-          <CoachChat />
+          {/* <CoachChat /> */}
           <Toaster position="top-right" richColors />
         </Providers>
       </body>
