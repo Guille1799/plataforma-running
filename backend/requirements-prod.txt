@@ -37,7 +37,7 @@ celery==5.4.0
 fitparse==1.2.0
 
 # Wearables/Garmin Integration
-garth==0.5.19
+garth==0.4.47
 garminconnect==0.2.24
 
 # AI/LLM
