@@ -16,12 +16,20 @@ from app.database import get_db
 from app.models import User
 from app.security import verify_token
 from app.core.config import settings
-from app.services.training_plan_service import TrainingPlanService
+from app.services.training_plan_service import get_training_plan_service
 import json
 
 router = APIRouter(prefix="/api/v1/training-plans", tags=["training-plans"])
-training_plan_service = TrainingPlanService()
 security_scheme = HTTPBearer()
+
+# Lazy loading wrapper
+_training_plan_service = None
+
+def _get_training_plan_service():
+    global _training_plan_service
+    if _training_plan_service is None:
+        _training_plan_service = get_training_plan_service()
+    return _training_plan_service
 
 
 def get_current_user(
@@ -176,7 +184,7 @@ def generate_training_plan(
             "notes": request.notes
         }
         
-        plan = training_plan_service.generate_plan(
+        plan = _get_training_plan_service().generate_plan(
             db=db,
             user=current_user,
             goal=goal,
@@ -338,7 +346,7 @@ def adapt_training_plan(
         ).order_by(Workout.start_time.desc()).all()
         
         # Adapt the plan
-        adapted_plan = training_plan_service.adapt_plan(
+        adapted_plan = _get_training_plan_service().adapt_plan(
             user=current_user,
             plan_id=plan_id,
             actual_workouts=actual_workouts,
@@ -482,7 +490,7 @@ def calculate_plan_duration_with_target_race(
         )
     
     try:
-        result = training_plan_service.calculate_plan_duration_with_target_race(
+        result = _get_training_plan_service().calculate_plan_duration_with_target_race(
             target_race_date=target_race_date,
             goal_type=goal_type,
             start_date=datetime.utcnow()
@@ -522,7 +530,7 @@ def get_plan_duration_options(
     **Requires authentication**
     """
     try:
-        result = training_plan_service.get_plan_duration_options(goal_type)
+        result = _get_training_plan_service().get_plan_duration_options(goal_type)
         return result
         
     except Exception as e:

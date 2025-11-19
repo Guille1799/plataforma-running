@@ -630,6 +630,13 @@ Responde en JSON con las semanas actualizadas."""
         }
 
 
-# Singleton
-training_plan_service = TrainingPlanService()
+# Lazy loading singleton
+_training_plan_service_instance = None
+
+def get_training_plan_service() -> "TrainingPlanService":
+    """Get or create the training plan service singleton."""
+    global _training_plan_service_instance
+    if _training_plan_service_instance is None:
+        _training_plan_service_instance = TrainingPlanService()
+    return _training_plan_service_instance
 
