@@ -10,10 +10,20 @@ from datetime import datetime
 from app import models, security, schemas
 from app.database import get_db
 from app.core.config import settings
-from app.services.coach_service import coach_service
+from app.services.coach_service import get_coach_service
 
 router = APIRouter(prefix="/api/v1/coach", tags=["AI Coach"])
 security_scheme = HTTPBearer()
+
+# Lazy-loaded coach service
+coach_service = None
+
+def _get_coach_service():
+    """Get coach service lazily."""
+    global coach_service
+    if coach_service is None:
+        coach_service = get_coach_service()
+    return coach_service
 
 
 def get_current_user(
@@ -91,7 +101,7 @@ def analyze_workout(
     
     try:
         # Call AI coach service
-        analysis_result = coach_service.analyze_workout(
+        analysis_result = _get_coach_service().analyze_workout(
             workout=workout,
             user=current_user,
             recent_workouts=recent_workouts,
@@ -131,7 +141,7 @@ def get_hr_zones(
             detail="Max heart rate not configured. Please update your profile or sync workouts."
         )
     
-    zones = coach_service.calculate_hr_zones(max_hr)
+    zones = _get_coach_service().calculate_hr_zones(max_hr)
     
     return {
         "max_heart_rate": max_hr,
@@ -174,7 +184,7 @@ def generate_training_plan(
             models.Workout.user_id == current_user.id
         ).order_by(models.Workout.start_time.desc()).limit(20).all()
         
-        plan = coach_service.generate_personalized_training_plan(
+        plan = _get_coach_service().generate_personalized_training_plan(
             user=current_user,
             recent_workouts=recent_workouts,
             plan_request=request,
@@ -227,7 +237,7 @@ def analyze_running_form(
         )
     
     try:
-        form_analysis = coach_service.analyze_running_form(
+        form_analysis = _get_coach_service().analyze_running_form(
             workout=workout,
             user=current_user
         )
@@ -283,7 +293,7 @@ def chat_with_coach(
     
     try:
         # Get AI response
-        chat_result = coach_service.chat_with_coach(
+        chat_result = _get_coach_service().chat_with_coach(
             user=current_user,
             user_message=message.message,
             conversation_history=conversation_history,
@@ -422,7 +432,7 @@ def analyze_workout_deep(
         )
     
     try:
-        analysis = coach_service.analyze_workout_deep(
+        analysis = _get_coach_service().analyze_workout_deep(
             db=db,
             user=current_user,
             workout=workout
@@ -451,7 +461,7 @@ def get_personalized_recommendation(
     coach_style = current_user.coach_style_preference or 'balanced'
     
     # Get base recommendation
-    base_recommendation = coach_service.generate_health_aware_recommendation(db, current_user)
+    base_recommendation = _get_coach_service().generate_health_aware_recommendation(db, current_user)
     
     # Customize based on device type
     device_focus = {

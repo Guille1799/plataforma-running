@@ -1497,6 +1497,19 @@ Retorna SOLO el JSON válido, sin explicaciones adicionales."""
         }
 
 
-# Singleton instance
-coach_service = CoachService()
+# Lazy-loaded singleton instance (instantiated on first use)
+_coach_service_instance = None
+
+def get_coach_service() -> "CoachService":
+    """Get or create the coach service singleton."""
+    global _coach_service_instance
+    if _coach_service_instance is None:
+        _coach_service_instance = CoachService()
+    return _coach_service_instance
+
+# Backwards compatibility alias
+@property
+def coach_service():
+    """Deprecated: Use get_coach_service() instead."""
+    return get_coach_service()
 
