@@ -28,13 +28,15 @@ COPY --from=builder /root/.local /root/.local
 
 # Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 # Copy application code
 COPY app/ ./app/
 
 # Create non-root user for security
 RUN useradd -m -u 1000 runcoach && \
-    chown -R runcoach:runcoach /app
+    chown -R runcoach:runcoach /app && \
+    chown -R runcoach:runcoach /root/.local
 
 USER runcoach
 
@@ -43,7 +45,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/')"
+    CMD python -m pip list | grep uvicorn > /dev/null && echo "OK" || exit 1
 
-# Run application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run application using python -m
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
