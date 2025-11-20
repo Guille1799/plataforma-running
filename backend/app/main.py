@@ -22,14 +22,17 @@ app = FastAPI(
     }
 )
 
-# CORS configuration - Allow all origins for now (can be restricted later)
-# This is necessary for Vercel preview URLs which change dynamically
+# CORS configuration - Must be FIRST middleware added
+# This allows Vercel preview URLs to communicate with the API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins - can be restricted to specific domains later
+    allow_origins=[
+        "*",  # Allow all origins (can be restricted later)
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all headers
 )
 
 # Include routers
@@ -78,16 +81,3 @@ def health_check() -> dict[str, str]:
         "service": "RunCoach AI API",
         "version": "0.1.0"
     }
-
-
-@app.options("/{path_name:path}", tags=["CORS"])
-async def preflight_handler(path_name: str) -> dict[str, str]:
-    """Handle CORS preflight requests.
-    
-    Args:
-        path_name: The path being requested
-        
-    Returns:
-        Empty response with CORS headers (handled by middleware)
-    """
-    return {}
