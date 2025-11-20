@@ -40,7 +40,7 @@ export function PersonalizedRecommendations() {
 
   const { data: chatData } = useQuery({
     queryKey: ['coach', 'recommendations'],
-    queryFn: () => apiClient.getChatHistory?.(0, 5),
+    queryFn: () => apiClient.getChatHistory?.(5),
     retry: 1,
   });
 
