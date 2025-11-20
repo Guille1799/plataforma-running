@@ -3,7 +3,6 @@
 import { useAuth } from '@/lib/auth-context'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
-import { TrainingDashboard } from '@/app/components/training-dashboard'
 
 export default function TrainingPage() {
   const { token, user } = useAuth()
@@ -36,8 +35,11 @@ export default function TrainingPage() {
           </div>
         )}
 
-        {/* Dashboard Component */}
-        <TrainingDashboard />
+        {/* Training Page - Coming Soon */}
+        <div className="p-8 text-center">
+          <h1 className="text-2xl font-bold text-white mb-4">Training Dashboard</h1>
+          <p className="text-gray-400">Training features coming soon...</p>
+        </div>
       </div>
     </div>
   )
