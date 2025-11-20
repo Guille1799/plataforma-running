@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # CORS
-    allowed_origins: str = "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,https://plataforma-running.vercel.app"
+    allowed_origins: str = "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,https://plataforma-running.vercel.app,https://plataforma-running-c0wt0v6c3-guilledummies-projects.vercel.app"
     
     # API Keys
     anthropic_api_key: Optional[str] = None
