@@ -5,17 +5,17 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function TrainingPage() {
-  const { token, user } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     // Redirect to login if not authenticated
-    if (!token) {
+    if (!isAuthenticated) {
       router.push('/login')
     }
-  }, [token, router])
+  }, [isAuthenticated, router])
 
-  if (!token) {
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Redirecting to login...</p>
