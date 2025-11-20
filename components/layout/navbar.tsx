@@ -1,9 +1,8 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { Bell, User } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
 export function Navbar() {
   const { user } = useAuth()
@@ -11,15 +10,9 @@ export function Navbar() {
   return (
     <nav className="border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-40">
       <div className="flex items-center justify-between h-16 px-6">
-        {/* Left - Search */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <Input
-              placeholder="Buscar entrenamientos..."
-              className="pl-10 bg-slate-900 border-slate-800 focus:border-blue-500"
-            />
-          </div>
+        {/* Left - Logo/Title */}
+        <div className="flex-1">
+          <h2 className="text-sm font-semibold text-white">Plataforma Running</h2>
         </div>
 
         {/* Right - Actions */}
