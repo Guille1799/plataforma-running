@@ -1,15 +1,9 @@
 'use client'
 
 import { useAuth } from '@/lib/auth-context'
-import { Bell, User, Search } from 'lucide-react'
+import { Bell, User } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
 export function Navbar() {
   const { user } = useAuth()
@@ -41,33 +35,18 @@ export function Navbar() {
           </Button>
 
           {/* User Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-slate-800"
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">
-                    {user?.email?.[0].toUpperCase()}
-                  </span>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-800">
-              <DropdownMenuItem disabled className="text-slate-400">
-                <User className="w-4 h-4 mr-2" />
-                {user?.email}
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                Configuración
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                Ayuda
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hover:bg-slate-800"
+            title={user?.email || 'User'}
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <span className="text-xs font-bold text-white">
+                {user?.email?.[0].toUpperCase()}
+              </span>
+            </div>
+          </Button>
         </div>
       </div>
     </nav>

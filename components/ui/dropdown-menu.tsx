@@ -6,7 +6,9 @@ interface DropdownMenuProps {
   children: React.ReactNode;
 }
 
-interface DropdownMenuTriggerProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface DropdownMenuTriggerProps extends React.HTMLAttributes<HTMLDivElement> {
+  asChild?: boolean;
+}
 
 interface DropdownMenuContentProps extends React.HTMLAttributes<HTMLDivElement> {
   align?: 'start' | 'end';
@@ -44,14 +46,24 @@ const DropdownMenu = ({ children }: DropdownMenuProps) => {
 };
 
 const DropdownMenuTrigger = React.forwardRef<HTMLDivElement, DropdownMenuTriggerProps>(
-  ({ children, ...props }, ref) => {
+  ({ children, asChild, ...props }, ref) => {
     const context = React.useContext(DropdownMenuContext);
     if (!context) throw new Error('DropdownMenuTrigger must be used within DropdownMenu');
+
+    const handleClick = () => context.setIsOpen(!context.isOpen);
+
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<any>, {
+        onClick: handleClick,
+        ref: ref,
+        ...props,
+      });
+    }
 
     return (
       <div
         ref={ref}
-        onClick={() => context.setIsOpen(!context.isOpen)}
+        onClick={handleClick}
         {...props}
       >
         {children}
