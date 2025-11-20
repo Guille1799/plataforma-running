@@ -13,6 +13,7 @@ models.Base.metadata.create_all(bind=engine)
 
 security = HTTPBearer()
 
+# Create FastAPI app
 app = FastAPI(
     title="RunCoach AI API",
     description="AI-powered sports coaching platform",
@@ -22,17 +23,15 @@ app = FastAPI(
     }
 )
 
-# CORS configuration - Must be FIRST middleware added
-# This allows Vercel preview URLs to communicate with the API
+# CORS configuration - MUST be added BEFORE any routes
+# This is the most permissive configuration - allows all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*",  # Allow all origins (can be restricted later)
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
-    expose_headers=["*"],  # Expose all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
+    max_age=600,
 )
 
 # Include routers
