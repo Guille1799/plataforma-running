@@ -17,12 +17,24 @@ def hash_password(password: str) -> str:
         Hashed password string
         
     Note:
-        bcrypt has a 72 byte limit, so passwords longer than 72 bytes are truncated.
+        bcrypt has a 72 byte limit (not characters), so passwords longer than 72 bytes are truncated.
         This is a known limitation of bcrypt and is acceptable for security.
     """
-    # bcrypt has a 72 byte limit - truncate if necessary
-    # This maintains security while preventing errors
-    truncated_password = password[:72]
+    # bcrypt has a 72 BYTE limit (not character limit) - truncate if necessary
+    # Convert to bytes, truncate, then decode back to string
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # Truncate to 72 bytes safely (avoiding mid-character cuts)
+        truncated_bytes = password_bytes[:72]
+        # Decode, handling potential incomplete UTF-8 sequences
+        try:
+            truncated_password = truncated_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            # If we cut in the middle of a multibyte char, keep removing bytes until valid
+            truncated_password = truncated_bytes[:71].decode('utf-8', errors='ignore')
+    else:
+        truncated_password = password
+    
     return pwd_context.hash(truncated_password)
 
 
@@ -37,10 +49,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         True if password matches, False otherwise
         
     Note:
-        Truncates password to 72 bytes to match bcrypt limitation.
+        Truncates password to 72 bytes to match hash_password behavior (bcrypt limitation).
     """
-    # Truncate to 72 bytes to match hash_password behavior
-    truncated_password = plain_password[:72]
+    # Truncate to 72 BYTES to match hash_password behavior
+    password_bytes = plain_password.encode('utf-8')
+    if len(password_bytes) > 72:
+        truncated_bytes = password_bytes[:72]
+        try:
+            truncated_password = truncated_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            truncated_password = truncated_bytes[:71].decode('utf-8', errors='ignore')
+    else:
+        truncated_password = plain_password
+        
     return pwd_context.verify(truncated_password, hashed_password)
 
 
