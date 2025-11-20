@@ -55,7 +55,9 @@ class Settings(BaseSettings):
     
     def get_allowed_origins(self) -> list[str]:
         """Parse allowed origins from comma-separated string."""
-        return [origin.strip() for origin in self.allowed_origins.split(",")]
+        origins = [origin.strip() for origin in self.allowed_origins.split(",")]
+        print(f"DEBUG: CORS allowed origins: {origins}")
+        return origins
 
 
 settings = Settings()
