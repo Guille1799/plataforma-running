@@ -49,7 +49,7 @@ export function InjuryPrevention() {
     });
 
     const totalDistance = weekWorkouts.reduce((sum, w) => sum + (w.distance_km || 0), 0);
-    const weeklyHours = weekWorkouts.reduce((sum, w) => sum + ((w.duration_minutes || 0) / 60), 0);
+    const weeklyHours = weekWorkouts.reduce((sum, w) => sum + ((w.duration_seconds || 0) / 3600), 0);
 
     // Risk 1: High training load
     if (totalDistance > 60) {

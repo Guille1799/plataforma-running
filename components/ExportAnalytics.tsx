@@ -63,7 +63,7 @@ export function ExportAnalytics() {
   // Calculate stats
   const stats = {
     totalDistance: filteredWorkouts.reduce((sum, w) => sum + (w.distance_km || 0), 0),
-    totalTime: filteredWorkouts.reduce((sum, w) => sum + (w.duration_minutes || 0), 0),
+    totalTime: filteredWorkouts.reduce((sum, w) => sum + ((w.duration_seconds || 0) / 60), 0),
     avgPace: filteredWorkouts.length
       ? filteredWorkouts.reduce((sum, w) => sum + (w.avg_pace_min_km || 0), 0) / filteredWorkouts.length
       : 0,
@@ -79,7 +79,7 @@ export function ExportAnalytics() {
       formatDate(w.date || w.start_time || ''),
       w.workout_type || 'Run',
       (w.distance_km || 0).toFixed(2),
-      w.duration_minutes || 0,
+      Math.round((w.duration_seconds || 0) / 60),
       formatPace(w.avg_pace_min_km),
       w.max_heart_rate || 'N/A',
       w.calories_burned || 0,
@@ -153,7 +153,7 @@ export function ExportAnalytics() {
             <td>${formatDate(w.date || w.start_time || '')}</td>
             <td>${w.workout_type || 'Run'}</td>
             <td>${(w.distance_km || 0).toFixed(2)} km</td>
-            <td>${w.duration_minutes || 0} min</td>
+            <td>${Math.round((w.duration_seconds || 0) / 60)} min</td>
             <td>${formatPace(w.avg_pace_min_km)}</td>
             <td>${w.max_heart_rate || 'N/A'} bpm</td>
             <td>${w.calories_burned || 0}</td>
