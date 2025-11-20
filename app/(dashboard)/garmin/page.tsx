@@ -248,7 +248,7 @@ export default function GarminPage() {
               <CardContent className="space-y-4">
                 <p className="text-slate-300">
                   Una vez conectado, sincroniza tus entrenamientos de Garmin Connect.
-                  Importaremos tus últimos 30 días de actividades.
+                  En la primera sincronización importaremos hasta 12 meses de actividades, en siguientes sincronizaciones los últimos 7 días.
                 </p>
                 
                 <Button

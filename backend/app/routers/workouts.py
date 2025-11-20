@@ -300,9 +300,9 @@ def _extract_fit_data(fit_file: fitparse.FitFile, filename: str) -> schemas.Work
     if speeds:
         max_speed = max(speeds)
     
-    # Calcular ritmo promedio (segundos por km)
+    # Calcular ritmo promedio (minutos por km)
     if duration_seconds > 0 and distance_meters > 0:
-        avg_pace = (duration_seconds / (distance_meters / 1000))
+        avg_pace = (duration_seconds / 60) / (distance_meters / 1000)
     
     return schemas.WorkoutCreate(
         sport_type=sport_type,
