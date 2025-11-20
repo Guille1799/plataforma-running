@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from . import models
 from .database import engine
@@ -22,14 +25,48 @@ app = FastAPI(
     }
 )
 
-# CORS configuration - MUST be added before other middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.get_allowed_origins(),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-)
+# Enhanced CORS configuration - allow Vercel and localhost
+class CORSMiddlewareEnhanced(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        origin = request.headers.get("origin")
+        
+        # Check if origin is allowed
+        allowed = False
+        if origin:
+            # Allow localhost
+            if origin.startswith("http://localhost") or origin.startswith("http://127.0.0.1"):
+                allowed = True
+            # Allow Vercel (production and preview)
+            elif origin.endswith(".vercel.app") or "vercel.app" in origin:
+                allowed = True
+        
+        # Handle preflight requests
+        if request.method == "OPTIONS":
+            if allowed:
+                return Response(
+                    status_code=200,
+                    headers={
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+            else:
+                return Response(status_code=400)
+        
+        # Process the request
+        response = await call_next(request)
+        
+        # Add CORS headers to response
+        if allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+        
+        return response
+
+# Add the enhanced CORS middleware
+app.add_middleware(CORSMiddlewareEnhanced)
 
 # Include routers
 app.include_router(auth.router, tags=["Authentication"])
