@@ -74,16 +74,15 @@ export function ExportAnalytics() {
   };
 
   const generateCSV = () => {
-    const headers = ['Date', 'Type', 'Distance (km)', 'Time (min)', 'Avg Pace', 'Max HR', 'Calories', 'Notes'];
+    const headers = ['Date', 'Type', 'Distance (km)', 'Time (min)', 'Avg Pace', 'Max HR', 'Calories'];
     const rows = filteredWorkouts.map(w => [
       formatDate(w.date || w.start_time || ''),
-      w.workout_type || 'Run',
+      w.sport_type || 'Run',
       (w.distance_km || 0).toFixed(2),
       Math.round((w.duration_seconds || 0) / 60),
       formatPace(w.avg_pace_min_km),
       w.max_heart_rate || 'N/A',
-      w.calories_burned || 0,
-      w.notes || ''
+      w.calories || 0
     ]);
 
     const csv = [headers, ...rows].map(row => 
@@ -151,12 +150,12 @@ export function ExportAnalytics() {
         ${filteredWorkouts.map(w => `
           <tr>
             <td>${formatDate(w.date || w.start_time || '')}</td>
-            <td>${w.workout_type || 'Run'}</td>
+            <td>${w.sport_type || 'Run'}</td>
             <td>${(w.distance_km || 0).toFixed(2)} km</td>
             <td>${Math.round((w.duration_seconds || 0) / 60)} min</td>
             <td>${formatPace(w.avg_pace_min_km)}</td>
             <td>${w.max_heart_rate || 'N/A'} bpm</td>
-            <td>${w.calories_burned || 0}</td>
+            <td>${w.calories || 0}</td>
           </tr>
         `).join('')}
       </table>
