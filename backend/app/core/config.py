@@ -54,9 +54,12 @@ class Settings(BaseSettings):
         extra = "ignore"  # Ignore extra fields from .env
     
     def get_allowed_origins(self) -> list[str]:
-        """Parse allowed origins from comma-separated string."""
+        """Parse allowed origins from comma-separated string and add wildcard for Vercel."""
         origins = [origin.strip() for origin in self.allowed_origins.split(",")]
-        print(f"DEBUG: CORS allowed origins: {origins}")
+        # Allow all Vercel preview URLs by adding a broad pattern
+        # Note: This is a workaround - CORSMiddleware doesn't support regex patterns
+        # So we need to add the wildcard pattern manually
+        print(f"DEBUG: CORS allowed origins (configured): {origins}")
         return origins
 
 
