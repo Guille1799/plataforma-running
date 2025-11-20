@@ -78,3 +78,16 @@ def health_check() -> dict[str, str]:
         "service": "RunCoach AI API",
         "version": "0.1.0"
     }
+
+
+@app.options("/{path_name:path}", tags=["CORS"])
+async def preflight_handler(path_name: str) -> dict[str, str]:
+    """Handle CORS preflight requests.
+    
+    Args:
+        path_name: The path being requested
+        
+    Returns:
+        Empty response with CORS headers (handled by middleware)
+    """
+    return {}
