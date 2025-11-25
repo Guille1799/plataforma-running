@@ -1,7 +1,7 @@
 """
 events.py - Endpoints for running events and races
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
@@ -40,6 +40,7 @@ def search_races(
     max_distance: Optional[float] = Query(None, description="Maximum distance in km"),
     limit: int = Query(20, ge=1, le=100, description="Max results"),
     current_user: models.User = Depends(get_current_user),
+    response: Response = None,
 ):
     """Search for running races/events.
     
@@ -61,6 +62,12 @@ def search_races(
             max_distance=max_distance,
             limit=limit,
         )
+        
+        # Force no-cache headers
+        if response:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
         
         return {
             "success": True,

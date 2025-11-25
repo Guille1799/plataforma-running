@@ -25,7 +25,7 @@ interface RaceSearchResult {
 }
 
 interface PlanFormData {
-  has_target_race: boolean;
+  has_target_race: boolean | null;
   target_race?: TrainingGoal;
   general_goal: 'marathon' | 'half_marathon' | '10k' | '5k' | 'improve_fitness' | 'build_endurance' | null;
   priority: 'speed' | 'endurance' | 'recovery' | 'balanced' | null;
@@ -51,13 +51,13 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<any>(null);
 
-  // Hooks for duration calculation
+  // Hooks for duration calculation (MOVED TO TOP - outside conditionals)
   const durationCalc = useCalculateDurationWithRace();
   const durationOpts = useDurationOptions();
   const [selectedDurationOption, setSelectedDurationOption] = useState<number | null>(null);
 
   const [formData, setFormData] = useState<PlanFormData>({
-    has_target_race: false,
+    has_target_race: null,
     general_goal: null,
     priority: null,
     training_days_per_week: null,
@@ -70,6 +70,13 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
     cross_training_types: [],
     recovery_focus: null,
   });
+
+  // FIXED: useEffect MUST be at top level, not inside conditionals
+  useEffect(() => {
+    if (step === 6 && formData.general_goal && !formData.has_target_race && !durationOpts.data) {
+      durationOpts.getDurationOptions(formData.general_goal);
+    }
+  }, [step, formData.general_goal, formData.has_target_race, durationOpts]);
 
   // Búsqueda real de carreras via API
   useEffect(() => {
@@ -84,15 +91,38 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('🔍 Buscando carreras con query:', raceSearchQuery);
-        const response = await apiClient.searchRaces(raceSearchQuery, undefined, undefined, undefined, undefined, undefined, 15);
-        console.log('📍 Respuesta del API:', response);
-        const races = response.races || [];
-        console.log('🏃 Carreras encontradas:', races.length);
+        console.log('🔍 SEARCH DEBUG: Query string:', raceSearchQuery);
+        console.log('🔍 SEARCH DEBUG: Calling apiClient.searchRaces...');
+        
+        const response = await apiClient.searchRaces(raceSearchQuery, undefined, undefined, undefined, undefined, undefined, 30);
+        
+        console.log('📍 SEARCH DEBUG: Full API response:', response);
+        console.log('📍 SEARCH DEBUG: response.races exists?', !!response.races);
+        console.log('📍 SEARCH DEBUG: response.races length?', response.races?.length);
+        
+        let races = response.races || [];
+        console.log(`📋 SEARCH DEBUG: races array BEFORE filter: ${races.length} items`);
+        console.log('📋 SEARCH DEBUG: races names:', races.map((r: any) => r.name));
+        
+        // FILTER: Show only FUTURE races (from today onwards)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        races = races.filter(race => {
+          const raceDate = new Date(race.date);
+          raceDate.setHours(0, 0, 0, 0);
+          return raceDate >= today; // Only future races from today onwards
+        });
+        
+        console.log(`🏃 SEARCH DEBUG: races array AFTER date filter (future only): ${races.length} items`);
+        
+        console.log('🎯 SEARCH DEBUG: About to call setRaceSearchResults with:', races);
         setRaceSearchResults(races);
+        console.log('🎯 SEARCH DEBUG: setRaceSearchResults called');
+        
         setIsSearching(false);
       } catch (err) {
-        console.error('❌ Error searching races:', err);
+        console.error('❌ SEARCH ERROR:', err);
+        console.error('❌ SEARCH ERROR stack:', (err as any)?.stack);
         setRaceSearchResults([]);
         setIsSearching(false);
       }
@@ -134,7 +164,13 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
       }
     } catch (err) {
       console.error('❌ Error calculating duration:', err);
-      alert('Error al calcular la duración del plan. Usa valores por defecto.');
+      // Don't alert - just skip duration calculation and let user proceed
+      console.log('⚠️ Using default duration: 12 weeks');
+      setFormData(prev => ({
+        ...prev,
+        plan_duration_weeks: 12,
+        duration_recommendation: 'Plan estándar de 12 semanas',
+      }));
     }
 
     setShowRaceSearch(false);
@@ -148,6 +184,38 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
   const calculateDefaultPace = (distanceKm: number): number => {
     return 6.0;
+  };
+
+  // Validar si todos los campos obligatorios del paso actual están rellenos
+  const isStepValid = (): boolean => {
+    switch (step) {
+      case 1:
+        // Paso 1: Debe seleccionar Sí o No explícitamente
+        return formData.has_target_race !== null;
+      case 2:
+        // Paso 2: Objetivo general Y Prioridad (ambos son obligatorios)
+        return formData.general_goal !== null && formData.priority !== null;
+      case 3:
+        // Paso 3: Prioridad y días de entrenamiento
+        return formData.priority !== null && formData.training_days_per_week !== null;
+      case 4:
+        // Paso 4: Día tirada larga (SOLO validar que esté seleccionado)
+        return formData.preferred_long_run_day !== null;
+      case 5:
+        // Paso 5: Entrenamientos Adicionales (Fuerza + Cross-training)
+        // Strength training: must select if YES
+        if (formData.include_strength_training === null) return false;
+        if (formData.include_strength_training && !formData.strength_location) return false;
+        // Cross training: must select if YES
+        if (formData.include_cross_training === null) return false;
+        if (formData.include_cross_training && formData.cross_training_types.length === 0) return false;
+        return true;
+      case 6:
+        // Paso 6: Método de entrenamiento y recuperación
+        return formData.training_method !== null && formData.recovery_focus !== null && formData.plan_duration_weeks !== null;
+      default:
+        return true;
+    }
   };
 
   const handleCreatePlan = async () => {
@@ -176,7 +244,7 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
       return;
     }
     if (!formData.preferred_long_run_day) {
-      alert('Por favor selecciona un día para la tirada larga');
+      alert('Por favor selecciona al menos 1 día para la tirada larga');
       return;
     }
     if (formData.include_strength_training === null) {
@@ -184,11 +252,15 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
       return;
     }
     if (formData.include_strength_training && !formData.strength_location) {
-      alert('Por favor selecciona dónde harás los entrenamientos de fuerza');
+      alert('Por favor selecciona el tipo de entrenamiento de fuerza');
       return;
     }
     if (formData.include_cross_training === null) {
       alert('Por favor indica si incluir cross-training');
+      return;
+    }
+    if (formData.include_cross_training && formData.cross_training_types.length === 0) {
+      alert('Por favor selecciona al menos 1 deporte para cross-training');
       return;
     }
     if (!formData.training_method) {
@@ -206,8 +278,9 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
     setIsLoading(true);
     try {
-      // Asegurar formato correcto para preferred_long_run_day (lowercase)
-      const dayValue = formData.preferred_long_run_day?.toLowerCase() || 'saturday';
+      // Asegurar formato correcto para preferred_long_run_day (puede ser múltiples días separados por coma)
+      const longRunDays = formData.preferred_long_run_day?.split(',').map(d => d.trim()).filter(Boolean) || [];
+      const dayValue = longRunDays.length > 0 ? longRunDays[0].toLowerCase() : 'saturday';
 
       const response = await apiClient.generateWeeklyPlan({
         general_goal: finalGoal,
@@ -218,7 +291,7 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
         preferred_long_run_day: dayValue,
         plan_duration_weeks: formData.plan_duration_weeks || 12,
         include_strength_training: formData.include_strength_training,
-        strength_location: formData.strength_location || 'gym',
+        strength_location: formData.strength_location || 'with_equipment',
         training_method: formData.training_method || 'automatic',
         include_cross_training: formData.include_cross_training || false,
         cross_training_types: formData.cross_training_types || [],
@@ -229,7 +302,10 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
       onPlanCreated(response.plan);
     } catch (err) {
       console.error('Error creating plan:', err);
-      alert('Error al crear el plan. Intenta nuevamente.');
+      const errorMsg = err instanceof Error ? err.message : 'Error desconocido';
+      const errorDetail = err instanceof Response ? await err.json().catch(() => ({})) : {};
+      console.error('Error details:', errorDetail);
+      alert(`Error al crear el plan: ${errorMsg}\n\nMira la consola para más detalles.`);
     } finally {
       setIsLoading(false);
     }
@@ -247,26 +323,53 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          {formData.has_target_race === null && (
+            <p className="text-sm text-orange-400 text-center mb-2">⚠️ Selecciona una opción para continuar</p>
+          )}
           <div className="flex gap-4">
             <button
               onClick={() => {
                 setFormData({ ...formData, has_target_race: false });
                 setStep(2);
               }}
-              className="flex-1 p-4 rounded-lg border-2 border-slate-600 hover:border-slate-500 text-left"
+              className={`flex-1 p-4 rounded-lg border-2 text-left transition ${
+                formData.has_target_race === false
+                  ? 'border-green-500 bg-green-900/30'
+                  : 'border-slate-600 hover:border-slate-500'
+              }`}
             >
-              <div className="font-semibold text-white">No</div>
-              <div className="text-sm text-slate-400">Entrenar sin carrera específica</div>
+              <div className={`font-semibold ${
+                formData.has_target_race === false ? 'text-green-400' : 'text-white'
+              }`}>
+                No
+              </div>
+              <div className={`text-sm ${
+                formData.has_target_race === false ? 'text-green-300' : 'text-slate-400'
+              }`}>
+                Entrenar sin carrera específica
+              </div>
             </button>
             <button
               onClick={() => {
                 setFormData({ ...formData, has_target_race: true });
                 setShowRaceSearch(true);
               }}
-              className="flex-1 p-4 rounded-lg border-2 border-blue-500 bg-blue-900/30 text-left"
+              className={`flex-1 p-4 rounded-lg border-2 text-left transition ${
+                formData.has_target_race === true
+                  ? 'border-blue-500 bg-blue-900/30'
+                  : 'border-slate-600 hover:border-slate-500'
+              }`}
             >
-              <div className="font-semibold text-blue-400">Sí</div>
-              <div className="text-sm text-blue-300">Tengo una carrera en mente</div>
+              <div className={`font-semibold ${
+                formData.has_target_race === true ? 'text-blue-400' : 'text-white'
+              }`}>
+                Sí
+              </div>
+              <div className={`text-sm ${
+                formData.has_target_race === true ? 'text-blue-300' : 'text-slate-400'
+              }`}>
+                Tengo una carrera en mente
+              </div>
             </button>
           </div>
 
@@ -294,18 +397,37 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
               {raceSearchResults.length > 0 && (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   <p className="text-xs text-slate-400">Se encontraron {raceSearchResults.length} carrera(s):</p>
-                  {raceSearchResults.map(race => (
-                    <button
-                      key={race.id}
-                      onClick={() => selectRace(race)}
-                      className="w-full p-3 text-left bg-slate-600 hover:bg-slate-500 rounded transition"
-                    >
-                      <div className="font-semibold text-white">{race.name}</div>
-                      <div className="text-xs text-slate-300">
-                        {race.distance_km} km • {new Date(race.date).toLocaleDateString('es-ES')} • {race.location}
-                      </div>
-                    </button>
-                  ))}
+                  {raceSearchResults.map(race => {
+                    const raceDate = new Date(race.date);
+                    const today = new Date();
+                    const daysUntilRace = Math.floor((raceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    const isVeryClose = daysUntilRace < 14;
+
+                    return (
+                      <button
+                        key={race.id}
+                        onClick={() => selectRace(race)}
+                        className={`w-full p-3 text-left rounded transition ${
+                          isVeryClose
+                            ? 'bg-orange-600/30 border border-orange-500 hover:bg-orange-600/50'
+                            : 'bg-slate-600 hover:bg-slate-500 border border-transparent'
+                        }`}
+                      >
+                        <div className="font-semibold text-white flex justify-between items-start">
+                          <span>{race.name}</span>
+                          {isVeryClose && <span className="text-xs bg-orange-600 px-2 py-1 rounded">⚠️ Próxima</span>}
+                        </div>
+                        <div className="text-xs text-slate-300">
+                          {race.distance_km} km • {new Date(race.date).toLocaleDateString('es-ES')} • {race.location}
+                        </div>
+                        {isVeryClose && (
+                          <div className="text-xs text-orange-300 mt-1">
+                            ⏰ Solo {daysUntilRace} días - El coach te ayudará a planificar el tapering
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 
@@ -539,7 +661,11 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
             <Button onClick={() => setStep(1)} className="flex-1 bg-slate-700 hover:bg-slate-600">
               Atrás
             </Button>
-            <Button onClick={() => setStep(3)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button 
+              onClick={() => setStep(3)} 
+              disabled={!isStepValid()}
+              className={`flex-1 ${isStepValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-500 cursor-not-allowed opacity-50'}`}
+            >
               Siguiente
             </Button>
           </div>
@@ -550,6 +676,40 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
   // PASO 3: Disponibilidad
   if (step === 3) {
+    const daysOfWeek = [
+      { value: 'monday', label: 'Lunes' },
+      { value: 'tuesday', label: 'Martes' },
+      { value: 'wednesday', label: 'Miércoles' },
+      { value: 'thursday', label: 'Jueves' },
+      { value: 'friday', label: 'Viernes' },
+      { value: 'saturday', label: 'Sábado' },
+      { value: 'sunday', label: 'Domingo' },
+    ];
+
+    // FIX: preferred_long_run_day can be multiple days (1-2) as string array or comma-separated
+    const selectedDays = formData.preferred_long_run_day 
+      ? (typeof formData.preferred_long_run_day === 'string' 
+          ? formData.preferred_long_run_day.split(',') 
+          : [formData.preferred_long_run_day])
+      : [];
+
+    const toggleDay = (day: string) => {
+      let newDays = selectedDays.includes(day)
+        ? selectedDays.filter(d => d !== day)
+        : [...selectedDays, day];
+      
+      // Max 2 days
+      if (newDays.length > 2) {
+        alert('Máximo 2 días para tirada larga');
+        return;
+      }
+      
+      setFormData({
+        ...formData,
+        preferred_long_run_day: newDays.join(',') as any,
+      });
+    };
+
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -576,34 +736,46 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2 text-white">Día para tirada larga</label>
-            <select
-              value={formData.preferred_long_run_day || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, preferred_long_run_day: e.target.value as any })
-              }
-              className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white"
-            >
-              <option value="">-- Selecciona un día --</option>
-              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                <option key={day} value={day}>
-                  {day === 'monday' && 'Lunes'}
-                  {day === 'tuesday' && 'Martes'}
-                  {day === 'wednesday' && 'Miércoles'}
-                  {day === 'thursday' && 'Jueves'}
-                  {day === 'friday' && 'Viernes'}
-                  {day === 'saturday' && 'Sábado'}
-                  {day === 'sunday' && 'Domingo'}
-                </option>
+            <label className="block text-sm font-medium mb-3 text-white">
+              Días para tirada larga <span className="text-xs text-slate-400">(elige 1-2 días)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {daysOfWeek.map(day => (
+                <label
+                  key={day.value}
+                  className={`p-3 rounded border-2 cursor-pointer transition ${
+                    selectedDays.includes(day.value)
+                      ? 'border-blue-500 bg-blue-900/30'
+                      : 'border-slate-600 hover:border-slate-500'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDays.includes(day.value)}
+                    onChange={() => toggleDay(day.value)}
+                    className="mr-2"
+                  />
+                  <span className="text-white">{day.label}</span>
+                </label>
               ))}
-            </select>
+            </div>
+            {selectedDays.length === 0 && (
+              <p className="text-xs text-red-400 mt-2">⚠️ Selecciona al menos 1 día</p>
+            )}
+            {selectedDays.length > 0 && (
+              <p className="text-xs text-blue-400 mt-2">✓ Seleccionados: {selectedDays.length} día(s)</p>
+            )}
           </div>
 
           <div className="flex gap-3 mt-6">
             <Button onClick={() => setStep(2)} className="flex-1 bg-slate-700 hover:bg-slate-600">
               Atrás
             </Button>
-            <Button onClick={() => setStep(4)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button 
+              onClick={() => setStep(4)} 
+              disabled={!isStepValid()}
+              className={`flex-1 ${isStepValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-500 cursor-not-allowed opacity-50'}`}
+            >
               Siguiente
             </Button>
           </div>
@@ -641,11 +813,11 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
           {formData.include_strength_training && (
             <div>
-              <label className="block text-sm font-medium mb-2 text-white">¿Dónde?</label>
+              <label className="block text-sm font-medium mb-2 text-white">Tipo de entrenamiento de fuerza</label>
               <div className="space-y-2">
                 {[
-                  { value: 'gym', label: '🏋️ Gimnasio' },
-                  { value: 'home', label: '🏠 Casa' },
+                  { value: 'with_equipment', label: '🏋️ Con equipo', desc: 'Pesas, kettlebells, bandas...' },
+                  { value: 'bodyweight', label: '💪 Sin equipo', desc: 'Peso corporal, sentadillas, flexiones...' },
                 ].map(option => (
                   <button
                     key={option.value}
@@ -656,7 +828,8 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
                         : 'border-slate-600 hover:border-slate-500'
                     }`}
                   >
-                    {option.label}
+                    <div className="font-semibold text-white">{option.label}</div>
+                    <div className="text-xs text-slate-400">{option.desc}</div>
                   </button>
                 ))}
               </div>
@@ -669,7 +842,15 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
               {['No', 'Sí'].map((option, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setFormData({ ...formData, include_cross_training: idx === 1 })}
+                  onClick={() => {
+                    const newValue = idx === 1;
+                    console.log('🔄 Cross-training clicked:', option, 'newValue:', newValue);
+                    setFormData({ 
+                      ...formData, 
+                      include_cross_training: newValue,
+                      cross_training_types: idx === 0 ? [] : formData.cross_training_types // Clear types if selecting "No"
+                    });
+                  }}
                   className={`flex-1 p-3 rounded border-2 transition ${
                     formData.include_cross_training === (idx === 1)
                       ? 'border-blue-500 bg-blue-900/30'
@@ -682,11 +863,93 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
             </div>
           </div>
 
+          {formData.include_cross_training && (
+            <div>
+              <label className="block text-sm font-medium mb-3 text-white">
+                Selecciona deportes complementarios <span className="text-xs text-slate-400">(elige 1 o más)</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'swimming', label: '🏊 Natación' },
+                  { value: 'cycling', label: '🚴 Ciclismo' },
+                  { value: 'rowing', label: '🚣 Remo' },
+                  { value: 'triathlon', label: '🏃‍♂️ Triatlón' },
+                  { value: 'yoga', label: '🧘 Yoga' },
+                  { value: 'pilates', label: '🤸 Pilates' },
+                ].map(sport => (
+                  <label
+                    key={sport.value}
+                    className={`p-3 rounded border-2 cursor-pointer transition ${
+                      formData.cross_training_types.includes(sport.value)
+                        ? 'border-green-500 bg-green-900/30'
+                        : 'border-slate-600 hover:border-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.cross_training_types.includes(sport.value)}
+                      onChange={() => {
+                        let newTypes = formData.cross_training_types.includes(sport.value)
+                          ? formData.cross_training_types.filter(t => t !== sport.value)
+                          : [...formData.cross_training_types, sport.value];
+                        
+                        // If selecting triathlon, remove swimming and cycling
+                        if (sport.value === 'triathlon' && !formData.cross_training_types.includes('triathlon')) {
+                          newTypes = newTypes.filter(t => t !== 'swimming' && t !== 'cycling');
+                          newTypes.push('triathlon');
+                        }
+                        
+                        // If triathlon is selected and we're removing it, don't auto-add swimming/cycling
+                        if (sport.value === 'triathlon' && formData.cross_training_types.includes('triathlon')) {
+                          newTypes = newTypes.filter(t => t !== 'triathlon');
+                        }
+                        
+                        // Block selecting swimming or cycling if triathlon is selected
+                        if ((sport.value === 'swimming' || sport.value === 'cycling') && 
+                            formData.cross_training_types.includes('triathlon')) {
+                          return; // Don't allow
+                        }
+                        
+                        setFormData({ ...formData, cross_training_types: newTypes });
+                      }}
+                      disabled={
+                        (sport.value === 'swimming' || sport.value === 'cycling') && 
+                        formData.cross_training_types.includes('triathlon')
+                      }
+                      className="mr-2"
+                    />
+                    <span className={`text-sm ${
+                      (sport.value === 'swimming' || sport.value === 'cycling') && 
+                      formData.cross_training_types.includes('triathlon')
+                        ? 'text-slate-500 line-through'
+                        : 'text-white'
+                    }`}>
+                      {sport.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-2 text-xs text-slate-400">
+                ℹ️ Seleccionar Triatlón desactiva Natación y Ciclismo (ya incluidos)
+              </div>
+              {formData.cross_training_types.length === 0 && (
+                <p className="text-xs text-orange-400 mt-2">⚠️ Selecciona al menos 1 deporte</p>
+              )}
+              {formData.cross_training_types.length > 0 && (
+                <p className="text-xs text-green-400 mt-2">✓ Seleccionados: {formData.cross_training_types.length} deporte(s)</p>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-3 mt-6">
             <Button onClick={() => setStep(3)} className="flex-1 bg-slate-700 hover:bg-slate-600">
               Atrás
             </Button>
-            <Button onClick={() => setStep(5)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button 
+              onClick={() => setStep(5)} 
+              disabled={!isStepValid()}
+              className={`flex-1 ${isStepValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-500 cursor-not-allowed opacity-50'}`}
+            >
               Siguiente
             </Button>
           </div>
@@ -764,7 +1027,11 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
             <Button onClick={() => setStep(4)} className="flex-1 bg-slate-700 hover:bg-slate-600">
               Atrás
             </Button>
-            <Button onClick={() => setStep(6)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+            <Button 
+              onClick={() => setStep(6)} 
+              disabled={!isStepValid()}
+              className={`flex-1 ${isStepValid() ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-500 cursor-not-allowed opacity-50'}`}
+            >
               Siguiente
             </Button>
           </div>
@@ -775,16 +1042,6 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
   // PASO 6: Duración del Plan
   if (step === 6) {
-    const autoLoadDurationOptions = async () => {
-      if (formData.general_goal && !formData.has_target_race && !durationOpts.data) {
-        await durationOpts.getDurationOptions(formData.general_goal);
-      }
-    };
-
-    useEffect(() => {
-      autoLoadDurationOptions();
-    }, [formData.general_goal]);
-
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -857,8 +1114,8 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
             </Button>
             <Button
               onClick={handleCreatePlan}
-              disabled={isLoading || !formData.plan_duration_weeks}
-              className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600"
+              disabled={isLoading || !isStepValid()}
+              className={`flex-1 ${isStepValid() ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 cursor-not-allowed opacity-50'}`}
             >
               {isLoading ? 'Creando plan...' : '✨ Crear Plan de Entrenamiento'}
             </Button>

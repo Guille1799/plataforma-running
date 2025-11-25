@@ -1,6 +1,7 @@
 """
 coach.py - AI Coach endpoints for workout analysis and training plans
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -11,6 +12,8 @@ from app import models, security, schemas
 from app.database import get_db
 from app.core.config import settings
 from app.services.coach_service import get_coach_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/coach", tags=["AI Coach"])
 security_scheme = HTTPBearer()
@@ -191,13 +194,81 @@ def generate_training_plan(
             db=db
         )
         
-        return {"plan": plan}
+        # SAVE PLAN to user preferences
+        if not current_user.preferences:
+            current_user.preferences = {}
+        
+        if "training_plans" not in current_user.preferences:
+            current_user.preferences["training_plans"] = []
+        
+        # Add metadata with ISO strings for JSON serialization
+        from datetime import datetime
+        plan["plan_id"] = plan.get("id", f"plan_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        plan["plan_name"] = plan.get("plan_name", f"{request.general_goal.upper()} Plan")
+        plan["goal_date"] = datetime.now().isoformat()
+        plan["total_weeks"] = plan.get("plan_duration_weeks", request.plan_duration_weeks or 12)
+        plan["created_at"] = datetime.now().isoformat()
+        plan["status"] = "active"
+        
+        current_user.preferences["training_plans"].append(plan)
+        db.commit()
+        
+        logger.info(f"✅ Training plan saved for user {current_user.id}")
+        
+        return {"plan": plan, "success": True, "message": "Plan created and saved successfully"}
         
     except Exception as e:
+        logger.error(f"❌ Error generating plan: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating plan: {str(e)}"
         )
+
+
+# ============================================================================
+# GET TRAINING PLANS
+# ============================================================================
+
+@router.get("/plan/list", response_model=Dict[str, Any])
+def list_training_plans(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all training plans for the current user."""
+    plans = []
+    if current_user.preferences and "training_plans" in current_user.preferences:
+        plans = current_user.preferences["training_plans"]
+    
+    return {
+        "plans": plans,
+        "count": len(plans)
+    }
+
+
+@router.get("/plan/{plan_id}", response_model=Dict[str, Any])
+def get_training_plan(
+    plan_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific training plan by ID."""
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plan = next((p for p in current_user.preferences["training_plans"] if p.get("id") == plan_id), None)
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan {plan_id} not found"
+        )
+    
+    return {
+        "plan": plan,
+        "success": True
+    }
 
 
 # ============================================================================

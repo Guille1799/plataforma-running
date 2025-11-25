@@ -1,11 +1,28 @@
 'use client';
 
 import { TrainingPlanFormV2 } from '../dashboard/training-plan-form-v2';
+import { TrainingPlanDetail } from '../dashboard/training-plan-detail';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function TrainingPlansPage() {
-  const router = useRouter();
+  const [createdPlan, setCreatedPlan] = useState<any>(null);
+
+  if (createdPlan) {
+    return (
+      <div className="p-8">
+        <div className="max-w-6xl mx-auto">
+          <button
+            onClick={() => setCreatedPlan(null)}
+            className="mb-6 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-sm"
+          >
+            ← Crear otro plan
+          </button>
+          <TrainingPlanDetail plan={createdPlan} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8">
@@ -28,8 +45,8 @@ export default function TrainingPlansPage() {
           <CardContent>
             <TrainingPlanFormV2
               onPlanCreated={(plan) => {
-                // Redirige al dashboard cuando se crea el plan
-                router.push('/dashboard?tab=training-plan');
+                // Show the created plan instead of redirecting
+                setCreatedPlan(plan);
               }}
             />
           </CardContent>

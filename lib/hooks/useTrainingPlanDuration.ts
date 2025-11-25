@@ -1,7 +1,7 @@
 /**
  * useTrainingPlanDuration.ts - Hook for training plan duration calculation
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { apiClient } from '@/lib/api-client';
 import type { DurationCalculationResult, DurationOption } from '@/lib/types';
 
@@ -58,9 +58,15 @@ export function useDurationOptions() {
     data: null,
   });
 
-  const getDurationOptions = async (
+  const getDurationOptions = useCallback(async (
     goalType: 'marathon' | 'half_marathon' | '10k' | '5k' | 'improve_fitness' | 'build_endurance'
   ): Promise<DurationOption[] | null> => {
+    // Prevent infinite loops - check if we already have data
+    if (state.data && state.data.length > 0) {
+      console.log('✅ Duration options already cached for', goalType);
+      return state.data;
+    }
+
     setState({ loading: true, error: null, data: null });
 
     try {
@@ -73,7 +79,7 @@ export function useDurationOptions() {
       console.error('❌ Error fetching duration options:', err);
       return null;
     }
-  };
+  }, [state.data]);
 
   return { ...state, getDurationOptions };
 }

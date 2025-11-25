@@ -594,18 +594,37 @@ class APIClient {
     maxDistance?: number,
     limit: number = 20
   ): Promise<any> {
-    const response = await this.client.get('/api/v1/events/races/search', {
-      params: {
-        q: query,
-        location,
-        date_from: dateFrom,
-        date_to: dateTo,
-        min_distance: minDistance,
-        max_distance: maxDistance,
-        limit,
-      },
-    });
-    return response.data;
+    console.log(`🔴 API CLIENT: Calling searchRaces with query="${query}", limit=${limit}`);
+    
+    try {
+      const response = await this.client.get('/api/v1/events/races/search', {
+        params: {
+          q: query,
+          location,
+          date_from: dateFrom,
+          date_to: dateTo,
+          min_distance: minDistance,
+          max_distance: maxDistance,
+          limit,
+          // Add timestamp to prevent browser caching
+          _t: Date.now(),
+        },
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        },
+      });
+      
+      console.log(`🟢 API CLIENT: Response received:`, response.data);
+      console.log(`🟢 API CLIENT: response.data.races length:`, response.data.races?.length);
+      console.log(`🟢 API CLIENT: Full race objects:`, response.data.races?.map((r: any) => ({ id: r.id, name: r.name })));
+      
+      return response.data;
+    } catch (error) {
+      console.error(`❌ API CLIENT: Error in searchRaces:`, error);
+      throw error;
+    }
   }
 
   async getUpcomingRaces(weeks: number = 12, limit: number = 10): Promise<any> {

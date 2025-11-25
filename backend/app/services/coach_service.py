@@ -1360,13 +1360,18 @@ INSTRUCCIONES CRÍTICAS:
 6. Incluye tipos: Easy Run, Tempo Run, Speed/Intervals, Long Run, Recovery
 {f'7. Los entrenamientos de fuerza deben ser 2x/semana en {plan_request.strength_location}' if plan_request.include_strength_training else ''}
 8. Respeta el enfoque de recuperación ({plan_request.recovery_focus})
+9. **IMPORTANTE - MÉTODO DE ENTRENAMIENTO**: 
+   - Si el método es "pace_based": Especifica SOLO ritmo (pace_min_per_km) y distancia. Omite heart_rate_zone.
+   - Si el método es "heart_rate_based": Especifica SOLO zona HR (heart_rate_zone 1-5) y duración. Omite pace_min_per_km y distancia.
+   - El método actual es: {training_method}
 
-FORMATO REQUERIDO (JSON structure):
+FORMATO REQUERIDO (JSON structure - ADAPTA SEGÚN EL MÉTODO):
 {{
   "id": "plan_YYYYMMDD_HHMMSS",
   "name": "Plan de {plan_request.plan_duration_weeks} semanas - {plan_request.general_goal}",
   "start_date": "{start_date.strftime('%Y-%m-%d')}",
   "end_date": "{end_date.strftime('%Y-%m-%d')}",
+  "training_method": "{training_method}",
   "weeks": [
     {{
       "week_number": 1,
@@ -1374,11 +1379,10 @@ FORMATO REQUERIDO (JSON structure):
         {{
           "day": "Lunes",
           "type": "Easy Run",
-          "description": "Carrera suave de calentamiento",
-          "distance_km": 7.5,
-          "pace_min_per_km": 6.2,
-          "heart_rate_zone": 2,
-          "duration_minutes": 45
+          "description": "Carrera suave de calentamiento"{"," if training_method == "pace_based" else ""}
+{f'"distance_km": 7.5,' if training_method == "pace_based" else ""}
+{f'"pace_min_per_km": 6.2,' if training_method == "pace_based" else ""}
+{f'"duration_minutes": 45' if training_method == "pace_based" else '"heart_rate_zone": 2,\n          "duration_minutes": 45'}
         }}
       ],
       "total_km": 45.0
