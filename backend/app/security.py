@@ -4,8 +4,8 @@ from typing import Any
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
-# Use argon2 instead of bcrypt to avoid version conflicts in production
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Use bcrypt for password hashing (most stable)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:

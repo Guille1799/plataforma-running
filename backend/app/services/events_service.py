@@ -184,6 +184,66 @@ SPANISH_RACES_DATABASE = [
         "participants_estimate": 7000,
         "source": "official",
     },
+    {
+        "id": "mar_malaga2025_dec",
+        "name": "Maratón de Málaga - Diciembre",
+        "location": "Málaga",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2025-12-07",
+        "distance_km": 42.195,
+        "elevation_m": 100,
+        "participants_estimate": 5000,
+        "source": "official",
+    },
+    {
+        "id": "10k_madrid_dec2025",
+        "name": "10K San Silvestre Vallecana",
+        "location": "Madrid",
+        "region": "Madrid",
+        "country": "España",
+        "date": "2025-12-31",
+        "distance_km": 10,
+        "elevation_m": 50,
+        "participants_estimate": 30000,
+        "source": "official",
+    },
+    {
+        "id": "half_barcelona_dec2025",
+        "name": "Media Maratón de Barcelona - Navidad",
+        "location": "Barcelona",
+        "region": "Cataluña",
+        "country": "España",
+        "date": "2025-12-21",
+        "distance_km": 21.0975,
+        "elevation_m": 120,
+        "participants_estimate": 4000,
+        "source": "official",
+    },
+    {
+        "id": "trail_valencia_dec2025",
+        "name": "Trail Nocturno Valencia",
+        "location": "Valencia",
+        "region": "Valencia",
+        "country": "España",
+        "date": "2025-12-13",
+        "distance_km": 15,
+        "elevation_m": 300,
+        "participants_estimate": 2000,
+        "source": "official",
+    },
+    {
+        "id": "5k_seville_dec2025",
+        "name": "5K Popular Sevilla - Diciembre",
+        "location": "Sevilla",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2025-12-06",
+        "distance_km": 5,
+        "elevation_m": 10,
+        "participants_estimate": 1500,
+        "source": "official",
+    },
     # Andalucía - Expanded
     {
         "id": "half_dos_hermanas2025",
@@ -366,6 +426,253 @@ SPANISH_RACES_DATABASE = [
         "participants_estimate": 1800,
         "source": "official",
     },
+    # ===== 2026 CARRERAS NACIONALES =====
+    # 2026 Enero-Febrero
+    {
+        "id": "marbcn2026",
+        "name": "Marató de Barcelona 2026",
+        "location": "Barcelona",
+        "region": "Cataluña",
+        "country": "España",
+        "date": "2026-03-08",
+        "distance_km": 42.195,
+        "elevation_m": 120,
+        "participants_estimate": 15000,
+        "source": "official",
+    },
+    {
+        "id": "mar_madrid2026",
+        "name": "Maratón de Madrid 2026",
+        "location": "Madrid",
+        "region": "Madrid",
+        "country": "España",
+        "date": "2026-04-12",
+        "distance_km": 42.195,
+        "elevation_m": 200,
+        "participants_estimate": 20000,
+        "source": "official",
+    },
+    {
+        "id": "half_seville2026",
+        "name": "Media Maratón de Sevilla 2026",
+        "location": "Sevilla",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-02-22",
+        "distance_km": 21.0975,
+        "elevation_m": 30,
+        "participants_estimate": 6000,
+        "source": "official",
+    },
+    {
+        "id": "half_dos_hermanas2026",
+        "name": "Media Maratón de Dos Hermanas 2026",
+        "location": "Dos Hermanas",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-03-22",
+        "distance_km": 21.0975,
+        "elevation_m": 25,
+        "participants_estimate": 3500,
+        "source": "official",
+    },
+    # 2026 Marzo-Abril
+    {
+        "id": "half_zaragoza2026",
+        "name": "Media Maratón de Zaragoza 2026",
+        "location": "Zaragoza",
+        "region": "Aragón",
+        "country": "España",
+        "date": "2026-04-19",
+        "distance_km": 21.0975,
+        "elevation_m": 40,
+        "participants_estimate": 2500,
+        "source": "official",
+    },
+    {
+        "id": "5k_valencia2026",
+        "name": "5K Popular de Valencia 2026",
+        "location": "Valencia",
+        "region": "Valencia",
+        "country": "España",
+        "date": "2026-05-10",
+        "distance_km": 5,
+        "elevation_m": 5,
+        "participants_estimate": 2000,
+        "source": "official",
+    },
+    {
+        "id": "half_bilbao2026",
+        "name": "Half Marathon Bilbao 2026",
+        "location": "Bilbao",
+        "region": "País Vasco",
+        "country": "España",
+        "date": "2026-05-17",
+        "distance_km": 21.0975,
+        "elevation_m": 100,
+        "participants_estimate": 4000,
+        "source": "official",
+    },
+    # 2026 Mayo-Junio
+    {
+        "id": "mar_cordoba2026",
+        "name": "Maratón de Córdoba 2026",
+        "location": "Córdoba",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-05-03",
+        "distance_km": 42.195,
+        "elevation_m": 120,
+        "participants_estimate": 2500,
+        "source": "official",
+    },
+    {
+        "id": "trail_granada2026",
+        "name": "Trail de Sierra Nevada 2026",
+        "location": "Granada",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-05-17",
+        "distance_km": 25,
+        "elevation_m": 1200,
+        "participants_estimate": 800,
+        "source": "official",
+    },
+    {
+        "id": "mar_oviedo2026",
+        "name": "Maratón de Oviedo 2026",
+        "location": "Oviedo",
+        "region": "Asturias",
+        "country": "España",
+        "date": "2026-06-28",
+        "distance_km": 42.195,
+        "elevation_m": 200,
+        "participants_estimate": 2000,
+        "source": "official",
+    },
+    {
+        "id": "mar_almeria2026",
+        "name": "Maratón de Almería 2026",
+        "location": "Almería",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-06-21",
+        "distance_km": 42.195,
+        "elevation_m": 50,
+        "participants_estimate": 1500,
+        "source": "official",
+    },
+    # 2026 Julio-Agosto
+    {
+        "id": "10k_barcelona2026",
+        "name": "10K Urbain Barcelona 2026",
+        "location": "Barcelona",
+        "region": "Cataluña",
+        "country": "España",
+        "date": "2026-07-19",
+        "distance_km": 10,
+        "elevation_m": 150,
+        "participants_estimate": 3000,
+        "source": "official",
+    },
+    {
+        "id": "half_granada2026",
+        "name": "Media Maratón de Granada 2026",
+        "location": "Granada",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-07-26",
+        "distance_km": 21.0975,
+        "elevation_m": 100,
+        "participants_estimate": 2200,
+        "source": "official",
+    },
+    {
+        "id": "marbcn_half2026",
+        "name": "Half Marathon Barcelona 2026",
+        "location": "Barcelona",
+        "region": "Cataluña",
+        "country": "España",
+        "date": "2026-08-30",
+        "distance_km": 21.0975,
+        "elevation_m": 80,
+        "participants_estimate": 7000,
+        "source": "official",
+    },
+    # 2026 Septiembre-Octubre
+    {
+        "id": "ultracatal2026",
+        "name": "Ultra Trail Costa Brava 2026",
+        "location": "Girona",
+        "region": "Cataluña",
+        "country": "España",
+        "date": "2026-09-20",
+        "distance_km": 65,
+        "elevation_m": 3500,
+        "participants_estimate": 1500,
+        "source": "official",
+    },
+    {
+        "id": "10k_sevilla2026",
+        "name": "10K Urbana Sevilla 2026",
+        "location": "Sevilla",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-09-06",
+        "distance_km": 10,
+        "elevation_m": 40,
+        "participants_estimate": 3000,
+        "source": "official",
+    },
+    {
+        "id": "half_jaen2026",
+        "name": "Media Maratón de Jaén 2026",
+        "location": "Jaén",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-04-12",
+        "distance_km": 21.0975,
+        "elevation_m": 80,
+        "participants_estimate": 2000,
+        "source": "official",
+    },
+    # 2026 Noviembre-Diciembre
+    {
+        "id": "mar_malaga2026",
+        "name": "Maratón de Málaga 2026",
+        "location": "Málaga",
+        "region": "Andalucía",
+        "country": "España",
+        "date": "2026-11-22",
+        "distance_km": 42.195,
+        "elevation_m": 100,
+        "participants_estimate": 5000,
+        "source": "official",
+    },
+    {
+        "id": "mar_valencia2026",
+        "name": "Maratón de Valencia 2026",
+        "location": "Valencia",
+        "region": "Valencia",
+        "country": "España",
+        "date": "2026-11-29",
+        "distance_km": 42.195,
+        "elevation_m": 10,
+        "participants_estimate": 12000,
+        "source": "official",
+    },
+    {
+        "id": "10k_madrid2026",
+        "name": "10K San Silvestre Vallecana 2026",
+        "location": "Madrid",
+        "region": "Madrid",
+        "country": "España",
+        "date": "2026-12-31",
+        "distance_km": 10,
+        "elevation_m": 50,
+        "participants_estimate": 30000,
+        "source": "official",
+    },
 ]
 
 
@@ -412,30 +719,38 @@ class EventsService:
         Returns:
             List of matching races
         """
-        # Crear clave de caché basada en parámetros principales
-        cache_key = f"search:{query}:{location}:{limit}"
-        
-        # Intenta obtener del caché primero
-        cached_result = _get_cached_search(cache_key)
-        if cached_result is not None:
-            logger.info(f"🚀 CACHE HIT for race search: {cache_key} (< 1ms)")
-            return cached_result
+        # NO usar caché para búsquedas por texto (necesitamos exactitud)
+        # Solo usar caché si es búsqueda sin query (próximas carreras)
+        if not query:
+            cache_key = f"search:{query}:{location}:{limit}"
+            cached_result = _get_cached_search(cache_key)
+            if cached_result is not None:
+                logger.info(f"🚀 CACHE HIT for race search: {cache_key} (< 1ms)")
+                return cached_result
         
         results = []
+        today = datetime.now().date()
         
         for race in self.races_db:
-            # Text search
+            # ALWAYS filter out past races (not yet run)
+            try:
+                race_date = datetime.strptime(race["date"], "%Y-%m-%d").date()
+                if race_date < today:
+                    continue
+            except:
+                pass
+            
+            # Text search - buscar en nombre, locación y región
             if query:
                 query_norm = self._normalize_search(query)
                 name_norm = self._normalize_search(race["name"])
                 location_norm = self._normalize_search(race.get("location", ""))
                 region_norm = self._normalize_search(race.get("region", ""))
                 
+                # Busca si el query está contenido en ANY del nombre, localización o región
                 if not (query_norm in name_norm or 
                        query_norm in location_norm or 
-                       query_norm in region_norm or
-                       name_norm in query_norm or
-                       location_norm in query_norm):
+                       query_norm in region_norm):
                     continue
             
             # Location filter
@@ -478,9 +793,11 @@ class EventsService:
         
         final_results = results[:limit]
         
-        # Guarda en caché
-        _set_cache_search(cache_key, final_results)
-        logger.info(f"✅ Race search stored in cache: {cache_key} ({len(final_results)} results)")
+        # Guarda en caché solo si no hay query (búsquedas sin texto)
+        if not query:
+            cache_key = f"search:{query}:{location}:{limit}"
+            _set_cache_search(cache_key, final_results)
+            logger.info(f"✅ Race search stored in cache: {cache_key} ({len(final_results)} results)")
         
         return final_results
     

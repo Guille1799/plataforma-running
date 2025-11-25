@@ -135,7 +135,12 @@ Genera el plan completo en JSON:"""
                     # Final fallback: create a basic plan structure
                     plan_data = self._create_fallback_plan(goal, weeks)
             
-            # Add metadata
+            # Add metadata with unique plan_id using microseconds
+            from datetime import datetime as dt
+            now = dt.utcnow()
+            timestamp = now.strftime('%Y%m%d_%H%M%S')
+            microseconds = now.microsecond // 1000  # Convert to milliseconds for shorter ID
+            plan_data['plan_id'] = f"plan_{timestamp}_{microseconds}"
             plan_data['created_at'] = datetime.utcnow().isoformat()
             plan_data['user_id'] = user.id
             plan_data['goal'] = goal

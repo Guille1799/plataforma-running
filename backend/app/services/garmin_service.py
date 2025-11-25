@@ -233,11 +233,14 @@ def parse_fit_file(fit_data: bytes, activity_id: str) -> Dict[str, any]:
     altitude_values = [r.get('enhanced_altitude', r.get('altitude')) for r in records]
     altitude_values = [a for a in altitude_values if a is not None]
     
+    # Calculate elevation gain with GPS noise filtering
+    # Threshold: 1 meter (filters GPS variance while preserving real elevation changes)
     elevation_gain = 0.0
+    elevation_threshold = 1.0  # meters - filters GPS noise
     if altitude_values:
         for i in range(1, len(altitude_values)):
             diff = altitude_values[i] - altitude_values[i-1]
-            if diff > 0:
+            if diff > elevation_threshold:
                 elevation_gain += diff
     
     # Running Form Metrics

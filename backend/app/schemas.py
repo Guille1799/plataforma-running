@@ -419,6 +419,12 @@ class TrainingWeek(BaseModel):
     total_km: float
 
 
+class DurationCalculationRequest(BaseModel):
+    """Schema para calcular la duración del plan basada en la carrera objetivo."""
+    target_race_date: str = Field(..., description="Fecha de la carrera (ISO format)")
+    goal_type: str = Field(..., description="marathon, half_marathon, 10k, 5k, improve_fitness, build_endurance")
+
+
 class TrainingPlanResponse(BaseModel):
     """Schema para la respuesta del plan de entrenamiento."""
     id: str
