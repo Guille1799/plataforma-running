@@ -14,8 +14,12 @@ Eres un asistente experto para una plataforma de running de nivel profesional. T
 - **Auth Context**: React context para manejo de sesión
 - **Formatters**: Utilidades para pace, distance, HR, dates
 - **Auth Pages**: Login y Register con diseño moderno
+- **Training Plans**: Generación de planes con AI (Llama 3.3 70B)
+- **Real Dates**: Workouts con fechas reales (no "day 1, day 2")
+- **Garmin Export**: Export de workouts a formato TCX
 
 ### 🚧 En Desarrollo
+- **Adaptive Coaching**: Ajustes dinámicos basados en métricas de salud (70% completado)
 - **Dashboard Layout**: Sidebar y navbar pendientes
 - **Dashboard Home**: Métricas y visualizaciones
 - **Workouts Page**: Lista y detalle de entrenamientos
@@ -147,13 +151,19 @@ frontend/
 
 ## 🎯 Prioridades Actuales
 
-### Sprint Actual: Frontend MVP
-1. ✅ Auth pages (login/register) con diseño moderno
-2. 🔄 Dashboard layout (sidebar + navbar)
-3. 🔄 Dashboard home con métricas de workouts
-4. ⏳ Lista de workouts con filtros
-5. ⏳ Detalle de workout con análisis AI
-6. ⏳ Chat interface con Coach AI
+### Sprint Actual: Completar Adaptive Coaching & Dashboard MVP
+1. 🔥 **Adaptive Coaching** (70% completado) - Ajustes dinámicos basados en métricas de salud
+   - Implementar evaluación de readiness score
+   - Ajustar intensidad de workouts automáticamente
+   - UI para mostrar ajustes recomendados
+2. ✅ Auth pages (login/register) con diseño moderno
+3. ✅ Training Plans con AI y fechas reales
+4. ✅ Export a Garmin (formato TCX)
+5. 🔄 Dashboard layout (sidebar + navbar)
+6. 🔄 Dashboard home con métricas de workouts
+7. ⏳ Lista de workouts con filtros
+8. ⏳ Detalle de workout con análisis AI
+9. ⏳ Chat interface con Coach AI
 
 ### Features Bloqueantes
 - **CORS**: Configurar en backend para permitir localhost:3000
@@ -164,7 +174,9 @@ frontend/
 
 - **next-intl removido**: Causaba conflictos, proyecto ahora single-language (español)
 - **Middleware eliminado**: No usar next-intl hasta reestructurar
-- **SQLite local**: Base de datos en backend/runcoach.db
+- **SQLite local**: Base de datos en backend/runcoach.db (244 KB)
+- **Adaptive Coaching**: Parcialmente implementado, falta integración completa con UI
+- **Dashboard Pages**: Pendientes de implementación (layout, home, workouts list)
 
 ## 📝 Comandos Útiles
 
@@ -202,7 +214,6 @@ cd backend
 Remove-Item runcoach.db
 # Luego arrancar servidor para recrear
 ```
-- Sé proactivo: anticipa necesidades (migrations, tests, tipos, validaciones)
 
 ## Estructura de Respuestas
 
