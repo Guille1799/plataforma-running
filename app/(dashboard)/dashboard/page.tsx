@@ -26,6 +26,8 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Workout } from '@/lib/types';
+import { WorkoutStatsChart } from '@/app/components/workout-stats-chart';
+import { HRZonesVisualizer } from '@/app/components/hr-zones-visualizer';
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -320,6 +322,22 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Charts Section */}
+      <div className="mt-12">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-white mb-2">Análisis Detallado</h2>
+          <p className="text-slate-400">Progresión y estadísticas de entrenamientos</p>
+        </div>
+        
+        {/* Workout Stats Charts */}
+        <WorkoutStatsChart />
+
+        {/* HR Zones Info */}
+        <div className="mt-8">
+          <HRZonesVisualizer maxHR={185} restingHR={60} currentHR={avgHR || undefined} />
+        </div>
+      </div>
     </div>
   );
 
