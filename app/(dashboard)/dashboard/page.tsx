@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/lib/auth-context';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
 import {
   Card,
@@ -23,20 +23,35 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Workout } from '@/lib/types';
 import { WorkoutStatsChart } from '@/app/components/workout-stats-chart';
 import { HRZonesVisualizer } from '@/app/components/hr-zones-visualizer';
+import { HRZonesVisualizerV2 } from '@/app/components/hr-zones-visualizer-v2';
+import { DateRangeFilter } from '@/app/components/date-range-filter';
+import { AlertCircle, Loader2 } from 'lucide-react';
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
 
   useEffect(() => {
     loadWorkouts();
   }, []);
+
+  // Filtrar workouts por rango de fechas
+  const filteredWorkouts = useMemo(() => {
+    return workouts.filter((w) => {
+      const workoutDate = parseISO(w.start_time);
+      return workoutDate >= dateRange.from && workoutDate <= dateRange.to;
+    });
+  }, [workouts, dateRange]);
 
   const loadWorkouts = async () => {
     try {
@@ -51,15 +66,15 @@ export default function DashboardPage() {
     }
   };
 
-  const totalDistance = workouts.reduce((sum, w) => sum + (w.distance_meters || 0), 0);
-  const totalTime = workouts.reduce((sum, w) => sum + (w.duration_seconds || 0), 0);
-  const avgPace = workouts.length > 0 
-    ? workouts.reduce((sum, w) => sum + (w.avg_pace || 0), 0) / workouts.length 
+  const totalDistance = filteredWorkouts.reduce((sum, w) => sum + (w.distance_meters || 0), 0);
+  const totalTime = filteredWorkouts.reduce((sum, w) => sum + (w.duration_seconds || 0), 0);
+  const avgPace = filteredWorkouts.length > 0
+    ? filteredWorkouts.reduce((sum, w) => sum + (w.avg_pace || 0), 0) / filteredWorkouts.length
     : 0;
-  const avgHR = workouts.length > 0 
-    ? Math.round(workouts.reduce((sum, w) => sum + (w.avg_heart_rate || 0), 0) / workouts.length)
+  const avgHR = filteredWorkouts.length > 0
+    ? Math.round(filteredWorkouts.reduce((sum, w) => sum + (w.avg_heart_rate || 0), 0) / filteredWorkouts.length)
     : 0;
-  const streakDays = calculateStreak(workouts);
+  const streakDays = calculateStreak(filteredWorkouts);
 
   function calculateStreak(workouts: Workout[]): number {
     if (workouts.length === 0) return 0;
@@ -329,14 +344,61 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-bold text-white mb-2">Análisis Detallado</h2>
           <p className="text-slate-400">Progresión y estadísticas de entrenamientos</p>
         </div>
-        
-        {/* Workout Stats Charts */}
-        <WorkoutStatsChart />
 
-        {/* HR Zones Info */}
-        <div className="mt-8">
-          <HRZonesVisualizer maxHR={185} restingHR={60} currentHR={avgHR || undefined} />
+        {/* Date Range Filter */}
+        <div className="mb-6">
+          <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
         </div>
+
+        {/* Workout Stats Charts */}
+        {isLoading ? (
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                <p className="text-slate-400">Cargando análisis de entrenamientos...</p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : workouts.length === 0 ? (
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <AlertCircle className="h-8 w-8 text-yellow-500" />
+                <div>
+                  <p className="text-slate-300 font-semibold">No hay entrenamientos sincronizados</p>
+                  <p className="text-slate-400 text-sm">
+                    Conecta tu dispositivo Garmin para comenzar a analizar tus entrenamientos
+                  </p>
+                </div>
+                <Link href="/garmin">
+                  <Button className="mt-4">Conectar Garmin</Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        ) : filteredWorkouts.length === 0 ? (
+          <Card className="bg-slate-900 border-slate-800">
+            <CardContent className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <AlertCircle className="h-8 w-8 text-yellow-500" />
+                <div>
+                  <p className="text-slate-300 font-semibold">No hay entrenamientos en este período</p>
+                  <p className="text-slate-400 text-sm">
+                    Selecciona otro rango de fechas o ajusta los filtros
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-8">
+            <WorkoutStatsChart workouts={filteredWorkouts} weeksToShow={5} />
+
+            {/* HR Zones Info */}
+            <HRZonesVisualizerV2 maxHR={185} restingHR={60} currentHR={avgHR || undefined} />
+          </div>
+        )}
       </div>
     </div>
   );
