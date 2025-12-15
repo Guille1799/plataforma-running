@@ -43,19 +43,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const checkOnboarding = async () => {
       try {
         const profile = await apiClient.getOnboardingStatus();
-        setUserProfile(profile);
-        setOnboardingCompleted(profile.onboarding_completed || false);
-        
-        // If on auth pages and authenticated, redirect based on onboarding status
-        if (pathname === '/login' || pathname === '/register') {
-          if (profile.onboarding_completed) {
-            router.push('/dashboard');
-          } else {
-            router.push('/onboarding');
+        if (profile) {
+          setUserProfile(profile);
+          setOnboardingCompleted(profile.onboarding_completed || false);
+          
+          // If on auth pages and authenticated, redirect based on onboarding status
+          if (pathname === '/login' || pathname === '/register') {
+            if (profile.onboarding_completed) {
+              router.push('/dashboard');
+            } else {
+              router.push('/onboarding');
+            }
           }
         }
       } catch (error) {
         console.error('Failed to fetch onboarding status:', error);
+        // Don't fail silently - allow user to continue
+        setOnboardingCompleted(false);
       } finally {
         setIsLoading(false);
       }
@@ -92,19 +96,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.login(credentials);
       setUser(response.user);
       
-      // Check onboarding status
+      // Check onboarding status (pero no bloquear si falla)
       try {
         const profile = await apiClient.getOnboardingStatus();
-        setUserProfile(profile);
-        setOnboardingCompleted(profile.onboarding_completed || false);
-        
-        if (profile.onboarding_completed) {
-          router.push('/dashboard');
+        if (profile) {
+          setUserProfile(profile);
+          setOnboardingCompleted(profile.onboarding_completed || false);
+          
+          if (profile.onboarding_completed) {
+            router.push('/dashboard');
+          } else {
+            router.push('/onboarding');
+          }
         } else {
-          router.push('/onboarding');
+          // Profile es null/undefined, ir al dashboard de todas formas
+          router.push('/dashboard');
         }
       } catch (error) {
         console.error('Failed to fetch profile after login:', error);
+        // No dejes que esto bloquee - simplemente ve al dashboard
         router.push('/dashboard');
       }
     } catch (error) {

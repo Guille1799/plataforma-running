@@ -1,33 +1,26 @@
-#!/bin/bash
-# start-all.ps1 - Start backend and frontend servers
+# Start Backend Server
+Write-Host "`n" -ForegroundColor Green
+Write-Host "╔═══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║        🚀 RunCoach AI - Backend Server (FastAPI)         ║" -ForegroundColor Cyan
+Write-Host "║                   Port: 8000                             ║" -ForegroundColor Cyan
+Write-Host "╚═══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
 
-Write-Host "================================" -ForegroundColor Cyan
-Write-Host "RunCoach Platform - Development Environment" -ForegroundColor Cyan
-Write-Host "================================" -ForegroundColor Cyan
+$backend_path = "c:\Users\Guille\proyectos\plataforma-running\backend"
+$conda_env = "C:\Users\Guille\miniconda3"
 
-# Function to start backend
-function Start-Backend {
-    Write-Host "`n[1] Starting Backend Server..." -ForegroundColor Yellow
-    cd "$PSScriptRoot\backend"
-    
-    Write-Host "    Installing dependencies (if needed)..." -ForegroundColor Gray
-    & .\venv\Scripts\python.exe -m pip install -q --upgrade pip 2>&1 | Out-Null
-    
-    Write-Host "    Starting Uvicorn on http://127.0.0.1:8000..." -ForegroundColor Green
-    & .\venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000 --reload
-}
+Write-Host "📂 Location: $backend_path" -ForegroundColor Yellow
+Write-Host "🐍 Python: $conda_env" -ForegroundColor Yellow
+Write-Host ""
 
-# Function to start frontend
-function Start-Frontend {
-    Write-Host "`n[2] Starting Frontend Server..." -ForegroundColor Yellow
-    cd "$PSScriptRoot\frontend"
-    
-    Write-Host "    Installing dependencies (if needed)..." -ForegroundColor Gray
-    npm install 2>&1 | Out-Null
-    
-    Write-Host "    Starting Next.js on http://localhost:3000..." -ForegroundColor Green
-    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-    npm run dev
+Set-Location $backend_path
+
+Write-Host "⏳ Starting Uvicorn..." -ForegroundColor Cyan
+& "$conda_env\Scripts\conda.exe" run -p $conda_env `
+    python -m uvicorn app.main:app `
+    --host 0.0.0.0 --port 8000 --reload
+
+Write-Host "`n✋ Server stopped" -ForegroundColor Yellow
 }
 
 # Clean up on exit

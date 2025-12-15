@@ -1382,7 +1382,7 @@ FORMATO REQUERIDO (JSON structure - ADAPTA SEGÚN EL MÉTODO):
           "description": "Carrera suave de calentamiento"{"," if training_method == "pace_based" else ""}
 {f'"distance_km": 7.5,' if training_method == "pace_based" else ""}
 {f'"pace_min_per_km": 6.2,' if training_method == "pace_based" else ""}
-{f'"duration_minutes": 45' if training_method == "pace_based" else '"heart_rate_zone": 2,\n          "duration_minutes": 45'}
+{f'"duration_minutes": 45' if training_method == "pace_based" else '"heart_rate_zone": 2, "duration_minutes": 45'}
         }}
       ],
       "total_km": 45.0

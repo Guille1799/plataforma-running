@@ -70,11 +70,11 @@ export function DateRangeFilter({ dateRange, onDateRangeChange }: DateRangeFilte
         const rangeLength = dateRange.to.getTime() - dateRange.from.getTime();
         const newFrom = new Date(dateRange.to.getTime());
         const newTo = new Date(dateRange.to.getTime() + rangeLength);
-        
+
         // No permitir ir al futuro
         const now = new Date();
         if (newFrom > now) return;
-        
+
         onDateRangeChange({
             from: newFrom,
             to: newTo > now ? now : newTo,
