@@ -76,7 +76,7 @@ export function TrainingPlanDetail({ plan }: TrainingPlanDetailProps) {
           <CardHeader><CardTitle className="text-white">📍 Calendario Rolling (2 Semanas)</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2 overflow-x-auto pb-2">
-              {weeks.map((_, idx) => (
+              {weeks.map((_: any, idx: number) => (
                 <button key={idx} onClick={() => setCurrentWeekIndex(Math.min(idx, weeks.length - 2))} disabled={idx >= weeks.length - 1}
                   className={`px-3 py-1 rounded font-semibold text-xs whitespace-nowrap ${currentWeekIndex === idx ? 'bg-blue-600 text-white' : idx === suggestedWeekIndex ? 'bg-blue-900/50 text-blue-300 border border-blue-500' : 'bg-slate-700 text-slate-300'} disabled:opacity-30`}>
                   S{idx + 1}
