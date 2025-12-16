@@ -222,8 +222,8 @@ def parse_fit_file(fit_data: bytes, activity_id: str) -> Dict[str, any]:
     distances = [r['distance'] for r in records if 'distance' in r and r['distance']]
     distance_meters = max(distances) if distances else 0.0
     
-    # Pace (min/km)
-    avg_pace = (duration_seconds / 60) / (distance_meters / 1000) if distance_meters > 0 else None
+    # Pace (segundos/km)
+    avg_pace = duration_seconds / (distance_meters / 1000) if distance_meters > 0 else None
     
     # Power
     power_values = [r['power'] for r in records if 'power' in r and r['power']]
