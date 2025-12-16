@@ -3,15 +3,15 @@
  */
 
 /**
- * Format pace in seconds per km to M'SS"/km format
+ * Format pace in seconds per km to MM:SS/km format
  */
 export function formatPace(secondsPerKm: number | null | undefined): string {
-  if (!secondsPerKm || secondsPerKm <= 0) return '--\'--"';
-  
+  if (!secondsPerKm || secondsPerKm <= 0) return '--:--';
+
   const minutes = Math.floor(secondsPerKm / 60);
   const seconds = Math.floor(secondsPerKm % 60);
-  
-  return `${minutes}'${seconds.toString().padStart(2, '0')}" /km`;
+
+  return `${minutes}:${seconds.toString().padStart(2, '0')}/km`;
 }
 
 /**
@@ -19,15 +19,15 @@ export function formatPace(secondsPerKm: number | null | undefined): string {
  */
 export function formatDuration(seconds: number | null | undefined): string {
   if (!seconds || seconds <= 0) return '--:--';
-  
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
-  
+
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
@@ -36,7 +36,7 @@ export function formatDuration(seconds: number | null | undefined): string {
  */
 export function formatDistance(meters: number | null | undefined): string {
   if (!meters || meters <= 0) return '0.00 km';
-  
+
   const km = meters / 1000;
   return `${km.toFixed(2)} km`;
 }
@@ -46,13 +46,13 @@ export function formatDistance(meters: number | null | undefined): string {
  */
 export function formatDistanceShort(meters: number | null | undefined): string {
   if (!meters || meters <= 0) return '0 km';
-  
+
   const km = meters / 1000;
-  
+
   if (km >= 1) {
     return `${Math.round(km)} km`;
   }
-  
+
   return `${Math.round(meters)} m`;
 }
 
@@ -90,13 +90,13 @@ export function formatRelativeTime(date: string | Date): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins} min ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return `${diffDays} days ago`;
-  
+
   return formatDate(date);
 }
 
@@ -142,7 +142,7 @@ export function formatTime(date: string | Date): string {
  */
 export function getZoneColor(zone: number | string): string {
   const zoneNum = typeof zone === 'string' ? parseInt(zone.replace(/\D/g, '')) : zone;
-  
+
   switch (zoneNum) {
     case 1:
       return 'text-green-500 bg-green-500/10 border-green-500/20';
@@ -164,7 +164,7 @@ export function getZoneColor(zone: number | string): string {
  */
 export function getZoneName(zone: number | string): string {
   const zoneNum = typeof zone === 'string' ? parseInt(zone.replace(/\D/g, '')) : zone;
-  
+
   switch (zoneNum) {
     case 1:
       return 'Recovery';

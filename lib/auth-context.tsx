@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check auth status on mount
   useEffect(() => {
     const token = apiClient.getToken();
-    
+
     if (!token) {
       setIsLoading(false);
       return;
@@ -46,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (profile) {
           setUserProfile(profile);
           setOnboardingCompleted(profile.onboarding_completed || false);
-          
+
           // If on auth pages and authenticated, redirect based on onboarding status
           if (pathname === '/login' || pathname === '/register') {
             if (profile.onboarding_completed) {
@@ -95,14 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.login(credentials);
       setUser(response.user);
-      
+
       // Check onboarding status (pero no bloquear si falla)
       try {
         const profile = await apiClient.getOnboardingStatus();
         if (profile) {
           setUserProfile(profile);
           setOnboardingCompleted(profile.onboarding_completed || false);
-          
+
           if (profile.onboarding_completed) {
             router.push('/dashboard');
           } else {
@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userData = await apiClient.getCurrentUser();
       setUser(userData);
-      
+
       // Also refetch profile and onboarding status
       const profile = await apiClient.getOnboardingStatus();
       setUserProfile(profile);
@@ -176,10 +176,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  
+
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
+
   return context;
 }

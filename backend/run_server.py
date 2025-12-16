@@ -14,13 +14,20 @@ print("   Swagger: http://localhost:8000/docs")
 print()
 
 try:
-    subprocess.run([
-        sys.executable, "-m", "uvicorn", 
-        "app.main:app",
-        "--host", "0.0.0.0",
-        "--port", "8000",
-        "--reload"
-    ], check=True)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--reload",
+        ],
+        check=True,
+    )
 except KeyboardInterrupt:
     print("\n✋ Server stopped by user")
 except Exception as e:

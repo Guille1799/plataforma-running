@@ -10,7 +10,7 @@ interface TrainingPlanDetailProps {
 
 export function TrainingPlanDetail({ plan }: TrainingPlanDetailProps) {
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
-  
+
   if (!plan) return null;
 
   const weeks = plan.weeks || [];
@@ -30,7 +30,7 @@ export function TrainingPlanDetail({ plan }: TrainingPlanDetailProps) {
     else if (day.type?.toLowerCase().includes('speed') || day.type?.toLowerCase().includes('interval')) dayColor = 'red';
     else if (day.type?.toLowerCase().includes('recovery') || day.type?.toLowerCase().includes('rest')) dayColor = 'blue';
     else if (day.type?.toLowerCase().includes('strength')) dayColor = 'purple';
-    
+
     const colorClass = {
       green: 'border-green-500 bg-green-900/20',
       orange: 'border-orange-500 bg-orange-900/20',
@@ -49,7 +49,7 @@ export function TrainingPlanDetail({ plan }: TrainingPlanDetailProps) {
         {day.description && <p className="text-sm text-slate-300 italic">{day.description}</p>}
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-600">
           {day.distance_km && <div className="bg-slate-900/50 p-2 rounded text-xs"><p className="text-slate-400">Distancia</p><p className="font-semibold text-white">{day.distance_km} km</p></div>}
-          {day.pace_min_per_km && <div className="bg-slate-900/50 p-2 rounded text-xs"><p className="text-slate-400">Ritmo</p><p className="font-semibold text-white">{Math.floor(day.pace_min_per_km)}'{Math.round((day.pace_min_per_km % 1) * 60)}"</p></div>}
+          {day.pace_min_per_km && <div className="bg-slate-900/50 p-2 rounded text-xs"><p className="text-slate-400">Ritmo</p><p className="font-semibold text-white">{Math.floor(day.pace_min_per_km)}:{Math.round((day.pace_min_per_km % 1) * 60).toString().padStart(2, '0')}/km</p></div>}
           {day.heart_rate_zone && <div className="bg-slate-900/50 p-2 rounded text-xs"><p className="text-slate-400">Zona HR</p><p className="font-semibold text-white">Z{day.heart_rate_zone}</p></div>}
           {day.duration_minutes && <div className="bg-slate-900/50 p-2 rounded text-xs"><p className="text-slate-400">Duración</p><p className="font-semibold text-white">{day.duration_minutes} min</p></div>}
         </div>
