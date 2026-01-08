@@ -597,3 +597,73 @@ class HealthMetricOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# EVENTS / RACES SCHEMAS
+# ============================================================================
+
+
+class EventBase(BaseModel):
+    """Base schema for event data."""
+
+    name: str = Field(..., min_length=1, max_length=200)
+    location: str = Field(..., min_length=1, max_length=100)
+    region: Optional[str] = Field(None, max_length=100)
+    country: str = Field(default="España", max_length=100)
+    date: datetime
+    distance_km: float = Field(..., gt=0)
+    elevation_m: Optional[int] = Field(None, ge=0)
+    participants_estimate: Optional[int] = Field(None, ge=0)
+    registration_url: Optional[str] = None
+    website_url: Optional[str] = None
+    description: Optional[str] = None
+    price_eur: Optional[float] = Field(None, ge=0)
+
+
+class EventCreate(EventBase):
+    """Schema for creating a new event."""
+
+    external_id: str = Field(..., min_length=1, max_length=100)
+    source: str = Field(default="manual", max_length=50)
+    verified: bool = Field(default=False)
+
+
+class EventUpdate(BaseModel):
+    """Schema for updating an event (all fields optional)."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    location: Optional[str] = Field(None, min_length=1, max_length=100)
+    region: Optional[str] = Field(None, max_length=100)
+    country: Optional[str] = Field(None, max_length=100)
+    date: Optional[datetime] = None
+    distance_km: Optional[float] = Field(None, gt=0)
+    elevation_m: Optional[int] = Field(None, ge=0)
+    participants_estimate: Optional[int] = Field(None, ge=0)
+    registration_url: Optional[str] = None
+    website_url: Optional[str] = None
+    description: Optional[str] = None
+    price_eur: Optional[float] = Field(None, ge=0)
+    verified: Optional[bool] = None
+
+
+class EventOut(EventBase):
+    """Schema for returning event data."""
+
+    id: int
+    external_id: str
+    source: str
+    verified: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EventSearchResponse(BaseModel):
+    """Schema for search results."""
+
+    success: bool = True
+    count: int
+    races: List[Dict[str, Any]]

@@ -1,14 +1,18 @@
 """
 events_service.py - Service for managing running events and races
-Integrates with multiple sources: RunSignUp, EventBrite, local databases
+Now uses PostgreSQL database instead of hardcoded data
 """
 import logging
 import json
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, func
 import unicodedata
 import re
 import time
+
+from app import models
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +39,46 @@ def _set_cache_search(query: str, results: List[Dict]):
     _cache_timestamps[query] = time.time()
     logger.debug(f"Cache SET for race search: {query} ({len(results)} results)")
 
-# Base de datos de carreras españolas (será ampliada con APIs en producción)
-SPANISH_RACES_DATABASE = [
+
+class EventsService:
+    """Service for managing running events and race searches."""
+    
+    def __init__(self, db: Session = None):
+        self.db = db
+    
+    @staticmethod
+    def _remove_accents(text: str) -> str:
+        """Remove accents from text for fuzzy matching."""
+        nfd = unicodedata.normalize('NFD', text)
+        return ''.join(char for char in nfd if unicodedata.category(char) != 'Mn')
+    
+    @staticmethod
+    def _normalize_search(text: str) -> str:
+        """Normalize search text."""
+        text = EventsService._remove_accents(text)
+        return text.lower().strip()
+    
+    @staticmethod
+    def event_to_dict(event: models.Event) -> Dict[str, Any]:
+        """Convert Event model to dictionary."""
+        return {
+            "id": event.external_id,
+            "name": event.name,
+            "location": event.location,
+            "region": event.region,
+            "country": event.country,
+            "date": event.date.strftime("%Y-%m-%d"),
+            "distance_km": event.distance_km,
+            "elevation_m": event.elevation_m,
+            "participants_estimate": event.participants_estimate,
+            "registration_url": event.registration_url,
+            "website_url": event.website_url,
+            "description": event.description,
+            "price_eur": event.price_eur,
+            "source": event.source,
+        }
+    
+    def search_races(
     # 2025 Q1
     {
         "id": "marbcn2025",
@@ -705,7 +747,7 @@ class EventsService:
         max_distance: Optional[float] = None,
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        """Search races with flexible criteria. CACHÉ ENABLED (1 hora TTL).
+        """Search races with flexible criteria using database.
         
         Args:
             query: Text search (name, location)
@@ -719,122 +761,118 @@ class EventsService:
         Returns:
             List of matching races
         """
-        # NO usar caché para búsquedas por texto (necesitamos exactitud)
-        # Solo usar caché si es búsqueda sin query (próximas carreras)
-        if not query:
-            cache_key = f"search:{query}:{location}:{limit}"
-            cached_result = _get_cached_search(cache_key)
-            if cached_result is not None:
-                logger.info(f"🚀 CACHE HIT for race search: {cache_key} (< 1ms)")
-                return cached_result
+        if not self.db:
+            logger.error("Database session not provided to EventsService")
+            return []
         
-        results = []
-        today = datetime.now().date()
+        # Start with base query filtering only future races
+        today = date.today()
+        query_builder = self.db.query(models.Event).filter(
+            models.Event.date >= today,
+            models.Event.verified == True
+        )
         
-        for race in self.races_db:
-            # ALWAYS filter out past races (not yet run)
+        # Text search - search in name, location, region
+        if query:
+            query_norm = self._normalize_search(query)
+            # Use SQL ILIKE for case-insensitive search
+            search_filter = or_(
+                func.lower(func.unaccent(models.Event.name)).contains(query_norm),
+                func.lower(func.unaccent(models.Event.location)).contains(query_norm),
+                func.lower(func.unaccent(models.Event.region)).contains(query_norm)
+            )
+            query_builder = query_builder.filter(search_filter)
+        
+        # Location filter
+        if location:
+            loc_norm = self._normalize_search(location)
+            location_filter = or_(
+                func.lower(func.unaccent(models.Event.location)).contains(loc_norm),
+                func.lower(func.unaccent(models.Event.region)).contains(loc_norm)
+            )
+            query_builder = query_builder.filter(location_filter)
+        
+        # Date filters
+        if date_from:
             try:
-                race_date = datetime.strptime(race["date"], "%Y-%m-%d").date()
-                if race_date < today:
-                    continue
-            except:
+                from_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+                query_builder = query_builder.filter(models.Event.date >= from_date)
+            except ValueError:
                 pass
-            
-            # Text search - buscar en nombre, locación y región
-            if query:
-                query_norm = self._normalize_search(query)
-                name_norm = self._normalize_search(race["name"])
-                location_norm = self._normalize_search(race.get("location", ""))
-                region_norm = self._normalize_search(race.get("region", ""))
-                
-                # Busca si el query está contenido en ANY del nombre, localización o región
-                if not (query_norm in name_norm or 
-                       query_norm in location_norm or 
-                       query_norm in region_norm):
-                    continue
-            
-            # Location filter
-            if location:
-                loc_norm = self._normalize_search(location)
-                race_loc = self._normalize_search(race.get("location", ""))
-                race_region = self._normalize_search(race.get("region", ""))
-                if not (loc_norm in race_loc or loc_norm in race_region or race_loc in loc_norm):
-                    continue
-            
-            # Date filters
-            if date_from:
-                try:
-                    race_date = datetime.strptime(race["date"], "%Y-%m-%d")
-                    from_date = datetime.strptime(date_from, "%Y-%m-%d")
-                    if race_date < from_date:
-                        continue
-                except:
-                    pass
-            
-            if date_to:
-                try:
-                    race_date = datetime.strptime(race["date"], "%Y-%m-%d")
-                    to_date = datetime.strptime(date_to, "%Y-%m-%d")
-                    if race_date > to_date:
-                        continue
-                except:
-                    pass
-            
-            # Distance filters
-            if min_distance and race["distance_km"] < min_distance:
-                continue
-            if max_distance and race["distance_km"] > max_distance:
-                continue
-            
-            results.append(race)
         
-        # Sort by date
-        results.sort(key=lambda x: x["date"])
+        if date_to:
+            try:
+                to_date = datetime.strptime(date_to, "%Y-%m-%d").date()
+                query_builder = query_builder.filter(models.Event.date <= to_date)
+            except ValueError:
+                pass
         
-        final_results = results[:limit]
+        # Distance filters
+        if min_distance:
+            query_builder = query_builder.filter(models.Event.distance_km >= min_distance)
+        if max_distance:
+            query_builder = query_builder.filter(models.Event.distance_km <= max_distance)
         
-        # Guarda en caché solo si no hay query (búsquedas sin texto)
-        if not query:
-            cache_key = f"search:{query}:{location}:{limit}"
-            _set_cache_search(cache_key, final_results)
-            logger.info(f"✅ Race search stored in cache: {cache_key} ({len(final_results)} results)")
+        # Order by date and apply limit
+        events = query_builder.order_by(models.Event.date).limit(limit).all()
         
-        return final_results
+        # Convert to dict format
+        results = [self.event_to_dict(event) for event in events]
+        
+        logger.info(f"🔍 Race search: query='{query}', location='{location}', results={len(results)}")
+        return results
     
     def get_race_by_id(self, race_id: str) -> Optional[Dict[str, Any]]:
-        """Get race details by ID."""
-        for race in self.races_db:
-            if race["id"] == race_id:
-                return race
+        """Get race details by external_id."""
+        if not self.db:
+            return None
+        
+        event = self.db.query(models.Event).filter(
+            models.Event.external_id == race_id
+        ).first()
+        
+        if event:
+            return self.event_to_dict(event)
         return None
     
     def get_upcoming_races(self, weeks_ahead: int = 12, limit: int = 10) -> List[Dict[str, Any]]:
         """Get upcoming races in the next N weeks."""
-        today = datetime.now()
+        if not self.db:
+            return []
+        
+        today = date.today()
         future_date = today + timedelta(weeks=weeks_ahead)
         
-        upcoming = []
-        for race in self.races_db:
-            try:
-                race_date = datetime.strptime(race["date"], "%Y-%m-%d")
-                if today <= race_date <= future_date:
-                    upcoming.append(race)
-            except:
-                pass
+        events = self.db.query(models.Event).filter(
+            and_(
+                models.Event.date >= today,
+                models.Event.date <= future_date,
+                models.Event.verified == True
+            )
+        ).order_by(models.Event.date).limit(limit).all()
         
-        upcoming.sort(key=lambda x: x["date"])
-        return upcoming[:limit]
+        return [self.event_to_dict(event) for event in events]
     
     def get_races_by_distance(self, distance_km: float, tolerance: float = 2.0) -> List[Dict[str, Any]]:
         """Get races similar to a specific distance."""
-        similar = []
-        for race in self.races_db:
-            if abs(race["distance_km"] - distance_km) <= tolerance:
-                similar.append(race)
+        if not self.db:
+            return []
         
-        similar.sort(key=lambda x: abs(x["distance_km"] - distance_km))
-        return similar
+        today = date.today()
+        min_dist = distance_km - tolerance
+        max_dist = distance_km + tolerance
+        
+        events = self.db.query(models.Event).filter(
+            and_(
+                models.Event.date >= today,
+                models.Event.distance_km >= min_dist,
+                models.Event.distance_km <= max_dist,
+                models.Event.verified == True
+            )
+        ).order_by(models.Event.date).all()
+        
+        return [self.event_to_dict(event) for event in events]
 
 
-# Singleton instance
-events_service = EventsService()
+# DO NOT create singleton - service requires DB session
+# Use EventsService(db) in routes instead

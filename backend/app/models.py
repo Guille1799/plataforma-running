@@ -337,3 +337,51 @@ class HealthMetric(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     __table_args__ = (UniqueConstraint("user_id", "date", name="uix_user_date_health"),)
+
+
+class Event(Base):
+    """Event model representing running races and events.
+
+    Attributes:
+        id: Auto-incremented primary key
+        external_id: External identifier (from APIs or user-defined)
+        name: Event name
+        location: City or venue
+        region: Region/State
+        country: Country (default España)
+        date: Event date
+        distance_km: Race distance in kilometers
+        elevation_m: Total elevation gain in meters
+        participants_estimate: Estimated number of participants
+        registration_url: URL for registration (optional)
+        website_url: Official event website (optional)
+        description: Event description (optional)
+        price_eur: Registration price in euros (optional)
+        source: Data source (official/api/manual/user_submitted)
+        verified: Whether the event is verified (admin-approved)
+        created_at: When the event was added
+        updated_at: Last update timestamp
+    """
+
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    external_id = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False, index=True)
+    location = Column(String, nullable=False)
+    region = Column(String, nullable=True)
+    country = Column(String, nullable=False, default="España")
+    date = Column(Date, nullable=False, index=True)
+    distance_km = Column(Float, nullable=False)
+    elevation_m = Column(Integer, nullable=True)
+    participants_estimate = Column(Integer, nullable=True)
+    registration_url = Column(String, nullable=True)
+    website_url = Column(String, nullable=True)
+    description = Column(String, nullable=True)
+    price_eur = Column(Float, nullable=True)
+    source = Column(String, nullable=False, default="official")
+    verified = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
