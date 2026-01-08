@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
+import { manualSync, getLastSyncTime, formatTimeSinceSync } from '@/hooks/useAutoSync';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,19 +12,32 @@ import { Label } from "@/components/ui/label";
 export default function GarminPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'garmin' | 'strava'>('garmin');
-  
+
   // Garmin state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
+
   // Strava state
   const [isConnectingStrava, setIsConnectingStrava] = useState(false);
   const [stravaConnected, setStravaConnected] = useState(false);
-  
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Update last sync time on mount and periodically
+  useEffect(() => {
+    const updateSyncTime = () => {
+      setLastSyncTime(formatTimeSinceSync());
+    };
+
+    updateSyncTime();
+    const interval = setInterval(updateSyncTime, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,16 +64,24 @@ export default function GarminPage() {
     setIsSyncing(true);
 
     try {
-      const result = await apiClient.syncGarmin();
-      setSuccess(`¡Sincronización exitosa! ${result.synced_count} entrenamientos nuevos añadidos.`);
-      
-      // Redirigir a workouts después de 2 segundos
-      setTimeout(() => {
-        router.push('/workouts');
-      }, 2000);
+      const result = await manualSync();
+
+      if (result.success) {
+        setSuccess(result.message);
+        setLastSyncTime(formatTimeSinceSync());
+
+        // Redirigir a workouts después de 2 segundos si hay nuevos datos
+        if (result.count > 0) {
+          setTimeout(() => {
+            router.push('/workouts');
+          }, 2000);
+        }
+      } else {
+        setError(result.message);
+      }
     } catch (err: any) {
       console.error('Error syncing Garmin:', err);
-      setError(err.response?.data?.detail || 'Error al sincronizar. ¿Ya conectaste tu cuenta?');
+      setError('Error al sincronizar. ¿Ya conectaste tu cuenta?');
     } finally {
       setIsSyncing(false);
     }
@@ -115,21 +137,19 @@ export default function GarminPage() {
         <div className="flex space-x-2 border-b border-slate-700">
           <button
             onClick={() => setActiveTab('garmin')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'garmin'
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'garmin'
                 ? 'text-blue-400 border-b-2 border-blue-400'
                 : 'text-slate-400 hover:text-slate-200'
-            }`}
+              }`}
           >
             ⌚ Garmin
           </button>
           <button
             onClick={() => setActiveTab('strava')}
-            className={`px-6 py-3 font-medium transition-colors ${
-              activeTab === 'strava'
+            className={`px-6 py-3 font-medium transition-colors ${activeTab === 'strava'
                 ? 'text-orange-400 border-b-2 border-orange-400'
                 : 'text-slate-400 hover:text-slate-200'
-            }`}
+              }`}
           >
             🚴 Strava
           </button>
@@ -243,20 +263,46 @@ export default function GarminPage() {
             {/* Sync Card */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
-                <CardTitle className="text-white">Sincronizar Entrenamientos</CardTitle>
+                <CardTitle className="text-white flex items-center justify-between">
+                  <span>Sincronizar Entrenamientos</span>
+                  {lastSyncTime && (
+                    <span className="text-sm font-normal text-slate-400">
+                      Última sincronización: {lastSyncTime}
+                    </span>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-slate-300">
-                  Una vez conectado, sincroniza tus entrenamientos de Garmin Connect.
-                  En la primera sincronización importaremos hasta 12 meses de actividades, en siguientes sincronizaciones los últimos 7 días.
-                </p>
-                
+                <div className="space-y-2">
+                  <p className="text-slate-300">
+                    Una vez conectado, sincroniza tus entrenamientos de Garmin Connect.
+                  </p>
+                  <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 text-sm text-blue-200">
+                    <p className="font-semibold mb-1">🔄 Sincronización automática activa</p>
+                    <p className="text-xs">
+                      Tus entrenamientos se sincronizan automáticamente cada 6 horas cuando abres la app.
+                      También puedes sincronizar manualmente cuando quieras.
+                    </p>
+                  </div>
+                  <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 text-sm text-slate-300">
+                    <p><strong>Primera sincronización:</strong> Importa 2 años de entrenamientos y métricas de salud</p>
+                    <p><strong>Siguientes:</strong> Solo nuevos datos desde la última sincronización</p>
+                  </div>
+                </div>
+
                 <Button
                   onClick={handleSync}
                   disabled={isSyncing}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  {isSyncing ? 'Sincronizando...' : '🔄 Sincronizar Ahora'}
+                  {isSyncing ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Sincronizando...
+                    </span>
+                  ) : (
+                    '🔄 Sincronizar Ahora'
+                  )}
                 </Button>
               </CardContent>
             </Card>

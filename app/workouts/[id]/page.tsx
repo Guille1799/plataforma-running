@@ -218,22 +218,6 @@ export default function WorkoutDetailPage() {
           </Card>
         )}
 
-        {/* Cadence */}
-        {workout.avg_cadence && (
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-slate-400">
-                Cadencia Promedio
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-white">
-                {Math.round(workout.avg_cadence)} rpm
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Max HR */}
         {workout.max_heart_rate && (
           <Card className="bg-slate-900 border-slate-800">
@@ -250,6 +234,90 @@ export default function WorkoutDetailPage() {
           </Card>
         )}
       </div>
+
+      {/* Running Dynamics Section */}
+      {(workout.avg_cadence || workout.avg_vertical_oscillation || workout.avg_stance_time || workout.left_right_balance) && (
+        <Card className="bg-gradient-to-br from-slate-900 to-slate-800 border-slate-700 mb-8">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              Dinámica de Carrera
+            </CardTitle>
+            <p className="text-sm text-slate-400 mt-1">
+              Métricas avanzadas de técnica y eficiencia
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* Cadence */}
+              {workout.avg_cadence && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Cadencia</p>
+                  <p className="text-3xl font-bold text-yellow-400">
+                    {Math.round(workout.avg_cadence)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">pasos/min</p>
+                </div>
+              )}
+
+              {/* Vertical Oscillation */}
+              {workout.avg_vertical_oscillation && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Oscilación Vertical</p>
+                  <p className="text-3xl font-bold text-cyan-400">
+                    {workout.avg_vertical_oscillation.toFixed(1)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">cm</p>
+                </div>
+              )}
+
+              {/* Stride Length */}
+              {workout.avg_stride_length && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Longitud Zancada</p>
+                  <p className="text-3xl font-bold text-blue-400">
+                    {workout.avg_stride_length.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">m</p>
+                </div>
+              )}
+
+              {/* Vertical Ratio */}
+              {workout.avg_vertical_oscillation && workout.avg_stride_length && workout.avg_stride_length > 0 && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Ratio Vertical</p>
+                  <p className="text-3xl font-bold text-indigo-400">
+                    {((workout.avg_vertical_oscillation / 100) / workout.avg_stride_length * 100).toFixed(1)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">%</p>
+                </div>
+              )}
+
+              {/* Stance Time */}
+              {workout.avg_stance_time && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Tiempo Contacto</p>
+                  <p className="text-3xl font-bold text-green-400">
+                    {Math.round(workout.avg_stance_time)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">ms</p>
+                </div>
+              )}
+
+              {/* Balance */}
+              {workout.left_right_balance != null && (
+                <div className="text-center">
+                  <p className="text-sm text-slate-400 mb-2">Equilibrio</p>
+                  <p className="text-2xl font-bold text-purple-400">
+                    {workout.left_right_balance.toFixed(1)}/{(100 - workout.left_right_balance).toFixed(1)}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">% I/D</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Details Card */}
       <Card className="bg-slate-900 border-slate-800">
@@ -274,33 +342,6 @@ export default function WorkoutDetailPage() {
                 })}
               </p>
             </div>
-
-            {workout.avg_stance_time && (
-              <div>
-                <p className="text-sm text-slate-500 mb-2">Tiempo de Apoyo Promedio</p>
-                <p className="text-lg font-semibold text-white">
-                  {workout.avg_stance_time.toFixed(2)} ms
-                </p>
-              </div>
-            )}
-
-            {workout.avg_vertical_oscillation && (
-              <div>
-                <p className="text-sm text-slate-500 mb-2">Oscilación Vertical Promedio</p>
-                <p className="text-lg font-semibold text-white">
-                  {workout.avg_vertical_oscillation.toFixed(2)} cm
-                </p>
-              </div>
-            )}
-
-            {workout.left_right_balance && (
-              <div>
-                <p className="text-sm text-slate-500 mb-2">Balance Izq/Der</p>
-                <p className="text-lg font-semibold text-white">
-                  {workout.left_right_balance.toFixed(1)} %
-                </p>
-              </div>
-            )}
 
             {workout.file_name && (
               <div>

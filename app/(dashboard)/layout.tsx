@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useAutoSync } from '@/hooks/useAutoSync';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 
@@ -13,6 +14,9 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { isLoading } = useAuth();
+
+  // Auto-sync Garmin data every 6 hours
+  useAutoSync();
 
   useEffect(() => {
     // Si no hay token, redirigir a login
@@ -39,12 +43,12 @@ export default function DashboardLayout({
       <aside className="w-64 flex-shrink-0 border-r border-slate-800">
         <Sidebar />
       </aside>
-      
+
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Navbar */}
         <Navbar />
-        
+
         {/* Page Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">

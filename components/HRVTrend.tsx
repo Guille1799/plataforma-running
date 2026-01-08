@@ -12,9 +12,10 @@ interface HRVTrendProps {
   metrics: HealthMetric[];
   days?: number;
   className?: string;
+  compact?: boolean;
 }
 
-export function HRVTrend({ metrics, days = 7, className = '' }: HRVTrendProps) {
+export function HRVTrend({ metrics, days = 7, className = '', compact = false }: HRVTrendProps) {
   const trendData = useMemo(() => {
     // Sort by date (most recent last)
     const sorted = [...metrics]
@@ -23,17 +24,17 @@ export function HRVTrend({ metrics, days = 7, className = '' }: HRVTrendProps) {
       .slice(-days);
 
     return sorted.map(m => ({
-      label: new Date(m.date).toLocaleDateString('es-ES', { 
-        month: 'short', 
-        day: 'numeric' 
+      label: new Date(m.date).toLocaleDateString('es-ES', {
+        month: 'short',
+        day: 'numeric'
       }),
       value: m.hrv_ms || 0,
     }));
   }, [metrics, days]);
 
   const latestHRV = trendData.length > 0 ? trendData[trendData.length - 1].value : 0;
-  const avgHRV = trendData.length > 0 
-    ? trendData.reduce((sum, d) => sum + d.value, 0) / trendData.length 
+  const avgHRV = trendData.length > 0
+    ? trendData.reduce((sum, d) => sum + d.value, 0) / trendData.length
     : 0;
 
   const getHRVStatus = (hrv: number) => {
@@ -47,59 +48,65 @@ export function HRVTrend({ metrics, days = 7, className = '' }: HRVTrendProps) {
 
   return (
     <Card className={`bg-slate-800/50 border-slate-700 ${className}`}>
-      <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
+      <CardHeader className={compact ? "pb-2" : ""}>
+        <CardTitle className={`text-white flex items-center justify-between ${compact ? "text-sm" : ""}`}>
           <span className="flex items-center gap-2">
             <span>❤️</span>
             <span>HRV Trend</span>
           </span>
-          <span className={`text-sm font-normal ${status.color}`}>
+          <span className={`${compact ? "text-xs" : "text-sm"} font-normal ${status.color}`}>
             {status.text}
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className={compact ? "space-y-2" : "space-y-4"}>
         {trendData.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-slate-400">No hay datos de HRV disponibles</p>
-            <p className="text-sm text-slate-500 mt-1">
-              Conecta un dispositivo compatible para ver tu HRV
-            </p>
+          <div className="text-center py-4">
+            <p className="text-slate-400 text-sm">No hay datos de HRV</p>
           </div>
         ) : (
           <>
             <LineChart
               data={trendData}
-              height={150}
+              height={compact ? 100 : 150}
               color="#3b82f6"
               showGrid={true}
-              showLabels={true}
+              showLabels={!compact}
             />
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-700">
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Último</p>
-                <p className="text-2xl font-bold text-white">
-                  {latestHRV.toFixed(0)}
-                  <span className="text-sm text-slate-400 ml-1">ms</span>
-                </p>
+            {/* Stats - Compact version */}
+            {compact ? (
+              <div className="flex justify-between text-xs text-slate-400 pt-1">
+                <span>Último: <strong className="text-white">{latestHRV.toFixed(0)}</strong> ms</span>
+                <span>Avg: <strong className="text-white">{avgHRV.toFixed(0)}</strong> ms</span>
               </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Promedio {days}d</p>
-                <p className="text-2xl font-bold text-white">
-                  {avgHRV.toFixed(0)}
-                  <span className="text-sm text-slate-400 ml-1">ms</span>
-                </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-700">
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Último</p>
+                  <p className="text-2xl font-bold text-white">
+                    {latestHRV.toFixed(0)}
+                    <span className="text-sm text-slate-400 ml-1">ms</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-400 mb-1">Promedio {days}d</p>
+                  <p className="text-2xl font-bold text-white">
+                    {avgHRV.toFixed(0)}
+                    <span className="text-sm text-slate-400 ml-1">ms</span>
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Info */}
-            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-              <p className="text-xs text-blue-300">
-                💡 <strong>HRV más alto</strong> indica mejor recuperación y adaptación al entrenamiento.
-              </p>
-            </div>
+            {/* Info - Only show in non-compact */}
+            {!compact && (
+              <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <p className="text-xs text-blue-300">
+                  💡 <strong>HRV más alto</strong> indica mejor recuperación y adaptación al entrenamiento.
+                </p>
+              </div>
+            )}
           </>
         )}
       </CardContent>

@@ -886,7 +886,8 @@ Mantén respuestas concisas (máximo 200 palabras) a menos que se solicite más 
                 comparison_context += (
                     f"{w.distance_meters/1000:.2f}km en {w.duration_seconds//60}min "
                 )
-                comparison_context += f"(pace {w.avg_pace:.2f} min/km, "
+                pace_formatted = self._format_pace(w.avg_pace) if w.avg_pace else "N/A"
+                comparison_context += f"(pace {pace_formatted}, "
                 comparison_context += f"FC {w.avg_heart_rate or 'N/A'} bpm)\n"
 
         # Build goals context
@@ -929,11 +930,12 @@ ANÁLISIS REQUERIDO:
    - Prioriza según impacto en rendimiento y objetivos
    - Sé específico y accionable
 
-5. **PLAN DE ENTRENAMIENTOS RECOMENDADOS**
-   - Sugiere 3-4 entrenamientos específicos para la próxima semana
-   - Incluye: tipo, distancia/duración, intensidad (zona HR), objetivo
-   - Alinea con objetivos del atleta
-   - Balance entre trabajo duro y recuperación
+5. **RECOMENDACIONES GENERALES**
+   - Sugiere el tipo de trabajo que debería enfocarse en la próxima semana (recuperación, mantenimiento, intensidad)
+   - NO des un plan detallado de entrenamientos (eso lo hará el Coach AI principal)
+   - Solo orienta sobre el enfoque general
+
+NOTA IMPORTANTE: Este es un análisis diagnóstico. Para planes de entrenamiento personalizados, el atleta debe consultar al Coach AI principal de la plataforma.
 
 Responde en español, de manera estructurada pero natural. Sé directo y práctico."""
 
@@ -967,12 +969,16 @@ Responde en español, de manera estructurada pero natural. Sé directo y prácti
 
     def _build_workout_context(self, workout: models.Workout, user: models.User) -> str:
         """Build detailed context string for a workout."""
+        pace_formatted = (
+            self._format_pace(workout.avg_pace) if workout.avg_pace else "N/A"
+        )
+
         context = f"""ENTRENAMIENTO A ANALIZAR:
 Fecha: {workout.start_time.strftime('%Y-%m-%d %H:%M')}
 Tipo: {workout.sport_type}
 Distancia: {workout.distance_meters/1000:.2f} km
 Duración: {workout.duration_seconds//60} min {workout.duration_seconds%60} seg
-Pace promedio: {workout.avg_pace:.2f} min/km
+Pace promedio: {pace_formatted}
 FC promedio: {workout.avg_heart_rate or 'N/A'} bpm
 FC máxima: {workout.max_heart_rate or 'N/A'} bpm"""
 
@@ -997,8 +1003,38 @@ FC máxima: {workout.max_heart_rate or 'N/A'} bpm"""
         # Add user context
         context += f"\n\nPERFIL DEL ATLETA:"
         context += f"\nNivel: {user.running_level or 'intermedio'}"
+
+        # Physical attributes
+        if user.height_cm:
+            context += f"\nAltura: {user.height_cm} cm"
+        if user.weight_kg:
+            context += f"\nPeso: {user.weight_kg} kg"
+
+        # Physiological data
         if user.max_heart_rate:
             context += f"\nFC máxima: {user.max_heart_rate} bpm"
+        if user.resting_heart_rate:
+            context += f"\nFC en reposo: {user.resting_heart_rate} bpm"
+        if user.vo2_max:
+            context += f"\nVO2 Max: {user.vo2_max} ml/kg/min"
+
+        # Age (calculate from birth_date if available)
+        if user.birth_date:
+            from datetime import date
+
+            today = date.today()
+            age = (
+                today.year
+                - user.birth_date.year
+                - (
+                    (today.month, today.day)
+                    < (user.birth_date.month, user.birth_date.day)
+                )
+            )
+            context += f"\nEdad: {age} años"
+
+        if user.gender:
+            context += f"\nSexo: {user.gender}"
 
         return context
 

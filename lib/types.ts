@@ -100,6 +100,7 @@ export interface Workout {
   max_cadence?: number;
   avg_stance_time?: number;
   avg_vertical_oscillation?: number;
+  avg_stride_length?: number;
   avg_leg_spring_stiffness?: number;
   left_right_balance?: number;
   file_name?: string;
@@ -128,13 +129,13 @@ export interface HealthMetric {
   id: number;
   user_id: number;
   date: string;
-  
+
   // Recovery Metrics
   hrv_ms?: number;
   resting_hr_bpm?: number;
   hrv_baseline_ms?: number;
   resting_hr_baseline_bpm?: number;
-  
+
   // Sleep Metrics
   sleep_duration_minutes?: number;
   sleep_score?: number;
@@ -142,30 +143,30 @@ export interface HealthMetric {
   rem_sleep_minutes?: number;
   light_sleep_minutes?: number;
   awake_minutes?: number;
-  
+
   // Readiness Metrics
   body_battery?: number;
   readiness_score?: number;
   stress_level?: number;
   recovery_score?: number;
-  
+
   // Activity Metrics
   steps?: number;
   calories_burned?: number;
   active_calories?: number;
   intensity_minutes?: number;
-  
+
   // Respiratory Metrics
   respiration_rate?: number;
   spo2_percentage?: number;
-  
+
   // Subjective Metrics
   energy_level?: number;  // 1-5
   soreness_level?: number;  // 1-5
   mood?: number;  // 1-5
   motivation?: number;  // 1-5
   notes?: string;
-  
+
   // Metadata
   source?: string;
   data_quality?: string;

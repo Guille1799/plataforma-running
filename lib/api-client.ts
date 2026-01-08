@@ -126,24 +126,24 @@ class APIClient {
   // WORKOUTS
   // ============================================================================
 
-  async getWorkouts(skip: number = 0, limit: number = 50): Promise<WorkoutListResponse> {
+  async getWorkouts(skip: number = 0, limit: number = 1000): Promise<WorkoutListResponse> {
     const response = await this.client.get<any>('/api/v1/workouts', {
       params: { skip, limit },
     });
-    
+
     // Backend puede retornar array directo o { workouts: [...], total: ... }
     const workoutsArray = Array.isArray(response.data) ? response.data : (response.data.workouts || []);
     const total = response.data.total || workoutsArray.length;
-    
+
     // Enrich workouts with computed properties for dashboard compatibility
     const enrichedWorkouts = enrichWorkouts(workoutsArray);
-    
+
     // Debug logging
     if (typeof window !== 'undefined' && enrichedWorkouts.length > 0) {
       console.log('🔍 API Client - First workout (raw):', workoutsArray[0]);
       console.log('✅ API Client - First workout (enriched):', enrichedWorkouts[0]);
     }
-    
+
     return { workouts: enrichedWorkouts, total };
   }
 
@@ -347,7 +347,7 @@ class APIClient {
   async importAppleHealth(file: File, maxDays: number = 30): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await this.client.post('/api/v1/health/import/apple-health', formData, {
       params: { max_days: maxDays },
       headers: {
@@ -595,7 +595,7 @@ class APIClient {
     limit: number = 20
   ): Promise<any> {
     console.log(`🔴 API CLIENT: Calling searchRaces with query="${query}", limit=${limit}`);
-    
+
     try {
       const response = await this.client.get('/api/v1/events/races/search', {
         params: {
@@ -615,11 +615,11 @@ class APIClient {
           'Expires': '0',
         },
       });
-      
+
       console.log(`🟢 API CLIENT: Response received:`, response.data);
       console.log(`🟢 API CLIENT: response.data.races length:`, response.data.races?.length);
       console.log(`🟢 API CLIENT: Full race objects:`, response.data.races?.map((r: any) => ({ id: r.id, name: r.name })));
-      
+
       return response.data;
     } catch (error) {
       console.error(`❌ API CLIENT: Error in searchRaces:`, error);

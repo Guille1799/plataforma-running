@@ -19,7 +19,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U runcoach"]
+      test: [ "CMD-SHELL", "pg_isready -U runcoach" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -33,7 +33,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -47,21 +47,21 @@ services:
     environment:
       # Database
       DATABASE_URL: postgresql://runcoach:runcoach_dev_password@db:5432/runcoach
-      
+
       # Security
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       REFRESH_TOKEN_EXPIRE_DAYS: 7
-      
+
       # AI
       GROQ_API_KEY: ${GROQ_API_KEY}
-      
+
       # Application
       DEBUG: "False"
       ENVIRONMENT: development
       ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8000
-      
+
       # Redis
       REDIS_URL: redis://redis:6379/0
     ports:
@@ -72,9 +72,79 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/app:/app/app  # Hot reload for development
+      - ./backend/app:/app/app # Hot reload for development
+      - garmin_tokens:/app/garmin_tokens # Persistent Garmin tokens
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Celery Worker - Processes background tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: runcoach_celery_worker
+    environment:
+      # Database
+      DATABASE_URL: postgresql://runcoach:runcoach_dev_password@db:5432/runcoach
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+
+      # AI
+      GROQ_API_KEY: ${GROQ_API_KEY}
+
+      # Application
+      DEBUG: "False"
+      ENVIRONMENT: development
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app # Hot reload for development
+      - garmin_tokens:/app/garmin_tokens # Persistent Garmin tokens
+    command: celery -A app.celery_app.celery_app worker --loglevel=info
+    restart: unless-stopped
+
+  # Celery Beat - Schedules periodic tasks
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: runcoach_celery_beat
+    environment:
+      # Database
+      DATABASE_URL: postgresql://runcoach:runcoach_dev_password@db:5432/runcoach
+
+      # Security
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+
+      # AI
+      GROQ_API_KEY: ${GROQ_API_KEY}
+
+      # Application
+      DEBUG: "False"
+      ENVIRONMENT: development
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app # Hot reload for development
+      - garmin_tokens:/app/garmin_tokens # Persistent Garmin tokens
+    command: celery -A app.celery_app.celery_app beat --loglevel=info
+    restart: unless-stopped
   # Frontend (placeholder for future Next.js app)
   # frontend:
   #   build:
@@ -91,6 +161,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  garmin_tokens:
+
 
 networks:
   default:

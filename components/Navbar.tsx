@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { SyncIndicator } from './sync-indicator'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -38,6 +39,9 @@ export default function Navbar() {
 
       {/* Right - Actions */}
       <div className="flex items-center gap-6 ml-auto">
+        {/* Sync Indicator */}
+        <SyncIndicator />
+
         {/* Notifications */}
         <button className="relative hover:text-blue-400 transition-colors">
           <Bell className="w-5 h-5 text-slate-400" />

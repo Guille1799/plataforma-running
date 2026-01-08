@@ -31,7 +31,7 @@ export default function WorkoutsPage() {
   const [dateTo, setDateTo] = useState('')
   const [sortBy, setSortBy] = useState('date-desc')
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
+  const itemsPerPage = 100
 
   // Pagination
   const filteredWorkouts = workouts

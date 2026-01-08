@@ -12,9 +12,10 @@ interface SleepQualityProps {
   metrics: HealthMetric[];
   days?: number;
   className?: string;
+  compact?: boolean;
 }
 
-export function SleepQuality({ metrics, days = 7, className = '' }: SleepQualityProps) {
+export function SleepQuality({ metrics, days = 7, className = '', compact = false }: SleepQualityProps) {
   const sleepData = useMemo(() => {
     const sorted = [...metrics]
       .filter(m => m.sleep_duration_minutes != null)
@@ -79,53 +80,80 @@ export function SleepQuality({ metrics, days = 7, className = '' }: SleepQuality
 
   return (
     <Card className={`bg-slate-800/50 border-slate-700 ${className}`}>
-      <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
+      <CardHeader className={compact ? "pb-2" : ""}>
+        <CardTitle className={`text-white flex items-center justify-between ${compact ? "text-sm" : ""}`}>
           <span className="flex items-center gap-2">
             <span>🌙</span>
             <span>Calidad del Sueño</span>
           </span>
-          <span className="text-sm font-normal" style={{ color: quality.color }}>
+          <span className={`${compact ? "text-xs" : "text-sm"} font-normal`} style={{ color: quality.color }}>
             {quality.text}
           </span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className={compact ? "space-y-2" : "space-y-6"}>
         {/* Main Score */}
-        <div className="flex items-center justify-center">
-          <ProgressRing
-            progress={latest.score}
-            size={140}
-            strokeWidth={12}
-            color={quality.color}
-            showLabel={true}
-            label="Score"
-          />
-        </div>
+        {compact ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-3xl font-bold text-white">
+                {hoursLatest.toFixed(1)}<span className="text-sm text-slate-400 ml-1">hrs</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-1">
+                Score: <span className="font-medium text-white">{latest.score}</span>/100
+              </div>
+            </div>
+            <ProgressRing
+              progress={latest.score}
+              size={80}
+              strokeWidth={8}
+              color={quality.color}
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center">
+            <ProgressRing
+              progress={latest.score}
+              size={140}
+              strokeWidth={12}
+              color={quality.color}
+            />
+          </div>
+        )}
 
         {/* Duration Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-slate-700/30 rounded-lg">
-            <p className="text-xs text-slate-400 mb-1">Anoche</p>
-            <p className="text-2xl font-bold text-white">
-              {hoursLatest.toFixed(1)}
-              <span className="text-sm text-slate-400 ml-1">hrs</span>
-            </p>
+        {!compact && (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+              <p className="text-xs text-slate-400 mb-1">Anoche</p>
+              <p className="text-2xl font-bold text-white">
+                {hoursLatest.toFixed(1)}
+                <span className="text-sm text-slate-400 ml-1">hrs</span>
+              </p>
+            </div>
+            <div className="text-center p-3 bg-slate-700/30 rounded-lg">
+              <p className="text-xs text-slate-400 mb-1">Promedio {days}d</p>
+              <p className="text-2xl font-bold text-white">
+                {hoursAverage.toFixed(1)}
+                <span className="text-sm text-slate-400 ml-1">hrs</span>
+              </p>
+            </div>
           </div>
-          <div className="text-center p-3 bg-slate-700/30 rounded-lg">
-            <p className="text-xs text-slate-400 mb-1">Promedio {days}d</p>
-            <p className="text-2xl font-bold text-white">
-              {hoursAverage.toFixed(1)}
-              <span className="text-sm text-slate-400 ml-1">hrs</span>
-            </p>
-          </div>
-        </div>
+        )}
 
-        {/* Sleep Stages */}
-        {(latest.deep > 0 || latest.rem > 0 || latest.light > 0) && (
+        {/* Compact stats */}
+        {compact && (
+          <div className="flex justify-between text-xs text-slate-400">
+            <span>Promedio: <strong className="text-white">{hoursAverage.toFixed(1)}h</strong></span>
+            <span>{days} días</span>
+          </div>
+        )}
+
+        {/* Sleep Stages - Only in non-compact */}
+        {!compact && (latest.deep > 0 || latest.rem > 0 || latest.light > 0) && (
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-400 uppercase">Fases del Sueño</p>
-            
+
             <div className="space-y-2">
               {/* Deep Sleep */}
               {latest.deep > 0 && (
@@ -178,8 +206,8 @@ export function SleepQuality({ metrics, days = 7, className = '' }: SleepQuality
           </div>
         )}
 
-        {/* Recommendation */}
-        {hoursLatest < 7 && (
+        {/* Recommendation - Only in non-compact */}
+        {!compact && hoursLatest < 7 && (
           <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
             <p className="text-xs text-yellow-300">
               ⚠️ <strong>Dormir menos de 7 horas</strong> puede afectar tu recuperación y rendimiento.
@@ -187,7 +215,7 @@ export function SleepQuality({ metrics, days = 7, className = '' }: SleepQuality
           </div>
         )}
 
-        {hoursLatest >= 7 && hoursLatest <= 9 && (
+        {!compact && hoursLatest >= 7 && hoursLatest <= 9 && (
           <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
             <p className="text-xs text-green-300">
               ✅ <strong>Excelente duración de sueño</strong> para optimizar tu recuperación.
