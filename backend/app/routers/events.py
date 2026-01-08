@@ -155,7 +155,7 @@ def get_races_by_distance(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting races by distance: {str(e)}"
+            detail=f"Error getting races by distance: {str(e)}",
         )
 
 
@@ -163,7 +163,10 @@ def get_races_by_distance(
 # ADMIN ENDPOINTS - Event Management (CRUD)
 # ============================================================================
 
-@router.post("/admin/races", response_model=schemas.EventOut, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/admin/races", response_model=schemas.EventOut, status_code=status.HTTP_201_CREATED
+)
 def create_race(
     event_data: schemas.EventCreate,
     current_user: models.User = Depends(get_current_user),
@@ -173,34 +176,34 @@ def create_race(
     # TODO: Add is_admin check
     try:
         # Check if external_id already exists
-        existing = db.query(models.Event).filter(
-            models.Event.external_id == event_data.external_id
-        ).first()
-        
+        existing = (
+            db.query(models.Event)
+            .filter(models.Event.external_id == event_data.external_id)
+            .first()
+        )
+
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Event with external_id '{event_data.external_id}' already exists"
+                detail=f"Event with external_id '{event_data.external_id}' already exists",
             )
-        
+
         # Create new event
-        new_event = models.Event(
-            **event_data.model_dump()
-        )
-        
+        new_event = models.Event(**event_data.model_dump())
+
         db.add(new_event)
         db.commit()
         db.refresh(new_event)
-        
+
         return new_event
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creating race: {str(e)}"
+            detail=f"Error creating race: {str(e)}",
         )
 
 
@@ -216,18 +219,20 @@ def list_all_races(
     # TODO: Add is_admin check
     try:
         query = db.query(models.Event)
-        
+
         if verified_only:
             query = query.filter(models.Event.verified == True)
-        
-        events = query.order_by(models.Event.date.desc()).offset(skip).limit(limit).all()
-        
+
+        events = (
+            query.order_by(models.Event.date.desc()).offset(skip).limit(limit).all()
+        )
+
         return events
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error listing races: {str(e)}"
+            detail=f"Error listing races: {str(e)}",
         )
 
 
@@ -240,30 +245,34 @@ def get_race_stats(
     # TODO: Add is_admin check
     try:
         from datetime import date
-        
+
         today = date.today()
-        
+
         total = db.query(models.Event).count()
         verified = db.query(models.Event).filter(models.Event.verified == True).count()
         future = db.query(models.Event).filter(models.Event.date >= today).count()
         past = db.query(models.Event).filter(models.Event.date < today).count()
-        
+
         # Distance breakdown
-        marathons = db.query(models.Event).filter(models.Event.distance_km >= 42).count()
-        half_marathons = db.query(models.Event).filter(
-            models.Event.distance_km >= 20,
-            models.Event.distance_km < 30
-        ).count()
-        ten_k = db.query(models.Event).filter(
-            models.Event.distance_km >= 9,
-            models.Event.distance_km < 12
-        ).count()
+        marathons = (
+            db.query(models.Event).filter(models.Event.distance_km >= 42).count()
+        )
+        half_marathons = (
+            db.query(models.Event)
+            .filter(models.Event.distance_km >= 20, models.Event.distance_km < 30)
+            .count()
+        )
+        ten_k = (
+            db.query(models.Event)
+            .filter(models.Event.distance_km >= 9, models.Event.distance_km < 12)
+            .count()
+        )
         five_k = db.query(models.Event).filter(models.Event.distance_km <= 5).count()
         ultras = db.query(models.Event).filter(models.Event.distance_km > 42.5).count()
-        
+
         # Latest event
         latest_event = db.query(models.Event).order_by(models.Event.date.desc()).first()
-        
+
         return {
             "success": True,
             "total_events": total,
@@ -277,12 +286,13 @@ def get_race_stats(
                 "5k": five_k,
                 "ultras": ultras,
             },
-            "latest_event_date": latest_event.date.strftime("%Y-%m-%d") if latest_event else None,
+            "latest_event_date": (
+                latest_event.date.strftime("%Y-%m-%d") if latest_event else None
+            ),
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error getting stats: {str(e)}"
+            detail=f"Error getting stats: {str(e)}",
         )
-

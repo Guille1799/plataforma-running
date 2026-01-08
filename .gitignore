@@ -12,6 +12,8 @@ venv/
 .venv/
 env/
 .env/
+*.db
+*.db-journal
 
 # --- Node.js (para el frontend/) ---
 node_modules/
@@ -24,3 +26,29 @@ yarn-error.log*
 # --- OS (macOS, Windows) ---
 .DS_Store
 Thumbs.db
+
+# --- Archivos temporales y scripts de debug ---
+check_*.py
+check_*.bat
+check_*.sql
+test_*.py
+debug_*.py
+*_results.txt
+*.backup
+sample_*.gpx
+sample_*.fit
+token.txt
+migrate_*.py
+setup_*.ps1
+
+# --- Documentación temporal ---
+*_SUMMARY.md
+*_STATUS.md
+*_REPORT.md
+*_REPORT.txt
+*_GUIDE.md
+*_CHECKLIST.md
+*_ANALYSIS.md
+*_STRATEGY.md
+*_FIX.md
+*_VERIFICATION*.md
