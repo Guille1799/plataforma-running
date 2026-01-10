@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api-client';
+import type { FormAnalysisResponse } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 
-interface AnalysisData {
-  analysis: string;
-  workout_id: number;
-  similar_workouts_count: number;
-  tokens_used: number;
-  analyzed_at: string;
+// Extended type to match what the component expects
+interface AnalysisData extends FormAnalysisResponse {
+  workout_id?: number;
+  similar_workouts_count?: number;
+  analyzed_at?: string;
 }
 
 export default function WorkoutAnalysisPage() {
@@ -34,12 +34,17 @@ export default function WorkoutAnalysisPage() {
         setLoading(true);
         setError(null);
 
-        const response = await apiClient.client.post<AnalysisData>(
-          `/api/v1/coach/analyze-deep/${workoutId}`,
-          {}
-        );
+        // Use the public method instead of accessing private client property
+        const response = await apiClient.analyzeWorkoutDeep(parseInt(workoutId));
 
-        setAnalysis(response.data);
+        // Adapt the response to match AnalysisData interface
+        const adaptedResponse: AnalysisData = {
+          ...response,
+          workout_id: parseInt(workoutId),
+          analyzed_at: new Date().toISOString(),
+        };
+
+        setAnalysis(adaptedResponse);
       } catch (err: any) {
         console.error('Error fetching analysis:', err);
 
@@ -111,13 +116,16 @@ export default function WorkoutAnalysisPage() {
               <CardHeader>
                 <CardTitle className="text-white">Análisis AI Coach</CardTitle>
                 <CardDescription className="text-slate-400">
-                  Análisis realizado el {new Date(analysis.analyzed_at).toLocaleDateString('es-ES', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {analysis.analyzed_at 
+                    ? `Análisis realizado el ${new Date(analysis.analyzed_at).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}`
+                    : 'Análisis realizado ahora'
+                  }
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -133,24 +141,36 @@ export default function WorkoutAnalysisPage() {
             <Card className="bg-slate-800/50 border-slate-700 backdrop-blur">
               <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-slate-400 text-xs uppercase tracking-wide">Entrenamientos Comparados</p>
-                    <p className="text-white text-lg font-semibold mt-1">
-                      {analysis.similar_workouts_count}
-                    </p>
-                  </div>
+                  {analysis.similar_workouts_count !== undefined && (
+                    <div>
+                      <p className="text-slate-400 text-xs uppercase tracking-wide">Entrenamientos Comparados</p>
+                      <p className="text-white text-lg font-semibold mt-1">
+                        {analysis.similar_workouts_count}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-slate-400 text-xs uppercase tracking-wide">Tokens Utilizados</p>
                     <p className="text-white text-lg font-semibold mt-1">
-                      {analysis.tokens_used}
+                      {analysis.tokens_used || 0}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-slate-400 text-xs uppercase tracking-wide">Workout ID</p>
-                    <p className="text-white text-lg font-semibold mt-1">
-                      #{analysis.workout_id}
-                    </p>
-                  </div>
+                  {analysis.workout_id && (
+                    <div>
+                      <p className="text-slate-400 text-xs uppercase tracking-wide">Workout ID</p>
+                      <p className="text-white text-lg font-semibold mt-1">
+                        #{analysis.workout_id}
+                      </p>
+                    </div>
+                  )}
+                  {analysis.efficiency_rating && (
+                    <div>
+                      <p className="text-slate-400 text-xs uppercase tracking-wide">Eficiencia</p>
+                      <p className="text-white text-lg font-semibold mt-1">
+                        {analysis.efficiency_rating}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
