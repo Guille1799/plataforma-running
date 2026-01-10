@@ -1,0 +1,314 @@
+name: 🟢 Monitor Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Permite ejecución manual desde GitHub UI
+  schedule:
+    # Ejecuta cada hora para monitoreo continuo
+    - cron: '0 * * * *'
+
+permissions:
+  contents: write  # Necesario para commit del archivo de estado
+  issues: write    # Necesario para crear issues automáticamente
+
+jobs:
+  monitor:
+    name: Monitor Production Services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0  # Necesario para commits
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Install dependencies
+        run: |
+          pip install requests --quiet
+      
+      - name: 🔍 Monitor Production Services
+        id: monitor
+        run: |
+          python3 << 'EOF'
+          import requests
+          import sys
+          import json
+          import os
+          from datetime import datetime
+          from pathlib import Path
+          
+          services = [
+              {
+                  "name": "Frontend (Vercel)",
+                  "url": "https://plataforma-running.vercel.app",
+                  "health_endpoint": "https://plataforma-running.vercel.app"
+              },
+              {
+                  "name": "Backend API (Render)",
+                  "url": "https://plataforma-running.onrender.com",
+                  "health_endpoint": "https://plataforma-running.onrender.com/health"
+              }
+          ]
+          
+          print("🔍 Monitoreo de Producción - RunCoach AI")
+          print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+          print("=" * 60)
+          print()
+          
+          results = []
+          all_healthy = True
+          
+          for service in services:
+              name = service["name"]
+              url = service["url"]
+              health_url = service["health_endpoint"]
+              
+              print(f"Verificando {name}...")
+              print(f"  URL: {url}")
+              print(f"  Health Check: {health_url}")
+              
+              result = {
+                  "name": name,
+                  "url": url,
+                  "health_endpoint": health_url,
+                  "status": "unknown",
+                  "status_code": None,
+                  "response_time_ms": None,
+                  "error": None,
+                  "timestamp": datetime.now().isoformat(),
+                  "healthy": False
+              }
+              
+              try:
+                  response = requests.get(health_url, timeout=15, allow_redirects=True)
+                  status_code = response.status_code
+                  response_time = response.elapsed.total_seconds() * 1000
+                  
+                  result["status_code"] = status_code
+                  result["response_time_ms"] = round(response_time, 2)
+                  
+                  if status_code == 200:
+                      status = "✅ HEALTHY"
+                      color = "\033[92m"  # Green
+                      healthy = True
+                      result["status"] = "healthy"
+                  elif status_code >= 300 and status_code < 400:
+                      status = "⚠️ REDIRECTING"
+                      color = "\033[93m"  # Yellow
+                      healthy = False
+                      all_healthy = False
+                      result["status"] = "redirecting"
+                  elif status_code == 503:
+                      status = "❌ UNAVAILABLE"
+                      color = "\033[91m"  # Red
+                      healthy = False
+                      all_healthy = False
+                      result["status"] = "unavailable"
+                      result["error"] = f"HTTP {status_code} - Service Unavailable"
+                  elif status_code >= 500:
+                      status = "❌ ERROR"
+                      color = "\033[91m"  # Red
+                      healthy = False
+                      all_healthy = False
+                      result["status"] = "error"
+                      result["error"] = f"HTTP {status_code} - Server Error"
+                  else:
+                      status = "⚠️ WARNING"
+                      color = "\033[93m"  # Yellow
+                      healthy = False
+                      all_healthy = False
+                      result["status"] = "warning"
+                      result["error"] = f"HTTP {status_code} - Unexpected Status"
+                  
+                  result["healthy"] = healthy
+                  
+                  print(f"  {color}{status}\033[0m")
+                  print(f"  Status Code: {status_code}")
+                  print(f"  Response Time: {response_time:.2f}ms")
+                  
+              except requests.exceptions.Timeout:
+                  status = "❌ TIMEOUT"
+                  print(f"  \033[91m{status}\033[0m")
+                  print(f"  Error: Timeout después de 15 segundos")
+                  result["status"] = "timeout"
+                  result["error"] = "Timeout después de 15 segundos"
+                  all_healthy = False
+                  
+              except requests.exceptions.ConnectionError as e:
+                  status = "❌ UNREACHABLE"
+                  print(f"  \033[91m{status}\033[0m")
+                  error_msg = str(e)
+                  print(f"  Error: No se pudo conectar al servidor: {error_msg}")
+                  result["status"] = "unreachable"
+                  result["error"] = f"Connection Error: {error_msg}"
+                  all_healthy = False
+                  
+              except Exception as e:
+                  status = "❌ ERROR"
+                  print(f"  \033[91m{status}\033[0m")
+                  error_msg = str(e)
+                  print(f"  Error: {error_msg}")
+                  result["status"] = "error"
+                  result["error"] = error_msg
+                  all_healthy = False
+              
+              results.append(result)
+              print()
+          
+          # Generar archivo de estado para que el AI pueda leerlo
+          status_file = Path("docs/PRODUCTION_STATUS.md")
+          status_file.parent.mkdir(parents=True, exist_ok=True)
+          
+          timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+          commit_sha = os.environ.get('GITHUB_SHA', 'unknown')[:7]
+          
+          healthy_count = sum(1 for r in results if r["healthy"])
+          total_count = len(results)
+          
+          with open(status_file, 'w', encoding='utf-8') as f:
+              f.write(f"# 🟢 Estado de Producción - RunCoach AI\n\n")
+              f.write(f"**Última actualización:** {timestamp}\n")
+              f.write(f"**Commit:** `{commit_sha}`\n")
+              f.write(f"**Workflow:** [Ver en GitHub Actions](https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'Guille1799/plataforma-running')}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')})\n\n")
+              
+              f.write(f"---\n\n")
+              f.write(f"## 📊 Resumen\n\n")
+              
+              if all_healthy:
+                  f.write(f"✅ **Todos los servicios están operativos** ({healthy_count}/{total_count})\n\n")
+              else:
+                  f.write(f"⚠️ **Algunos servicios tienen problemas** ({healthy_count}/{total_count} operativos)\n\n")
+              
+              f.write(f"### Servicios Monitoreados\n\n")
+              
+              for result in results:
+                  name = result["name"]
+                  url = result["url"]
+                  status = result["status"]
+                  status_code = result["status_code"]
+                  response_time = result["response_time_ms"]
+                  error = result["error"]
+                  
+                  # Icono según estado
+                  icon = "✅" if result["healthy"] else "❌" if status in ["error", "unavailable", "timeout", "unreachable"] else "⚠️"
+                  
+                  f.write(f"#### {icon} {name}\n\n")
+                  f.write(f"- **URL:** {url}\n")
+                  f.write(f"- **Health Check:** {result['health_endpoint']}\n")
+                  f.write(f"- **Estado:** `{status}`\n")
+                  
+                  if status_code:
+                      f.write(f"- **Status Code:** `{status_code}`\n")
+                  
+                  if response_time:
+                      f.write(f"- **Response Time:** `{response_time}ms`\n")
+                  
+                  if error:
+                      f.write(f"- **Error:** `{error}`\n")
+                  
+                  f.write(f"- **Timestamp:** {result['timestamp']}\n\n")
+              
+              f.write(f"---\n\n")
+              f.write(f"## 📋 Detalles Técnicos\n\n")
+              f.write(f"```json\n")
+              f.write(json.dumps(results, indent=2, ensure_ascii=False))
+              f.write(f"\n```\n\n")
+              
+              f.write(f"---\n\n")
+              f.write(f"*Este archivo se actualiza automáticamente después de cada push a `main`*\n")
+              f.write(f"*Para verificar manualmente: `.\scripts\production-monitor.ps1`*\n")
+          
+          print("=" * 60)
+          print("📊 Resumen")
+          print()
+          
+          if all_healthy:
+              print(f"\033[92m✅ Todos los servicios están operativos ({healthy_count}/{total_count})\033[0m")
+              print(f"\n📄 Estado guardado en: docs/PRODUCTION_STATUS.md")
+              sys.exit(0)
+          else:
+              print(f"\033[93m⚠️  Algunos servicios tienen problemas ({healthy_count}/{total_count} operativos)\033[0m")
+              failed = [r for r in results if not r["healthy"]]
+              for service in failed:
+                  print(f"  - \033[91m{service['name']}: {service['status']}\033[0m")
+                  if service.get('error'):
+                      print(f"    Error: {service['error']}")
+              print(f"\n📄 Estado guardado en: docs/PRODUCTION_STATUS.md")
+              print(f"⚠️  Revisa docs/PRODUCTION_STATUS.md para detalles completos")
+              sys.exit(1)
+          EOF
+      
+      - name: 📝 Commit status file
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/PRODUCTION_STATUS.md
+          
+          # Solo commit si hay cambios
+          if ! git diff --staged --quiet; then
+            git commit -m "ci: Update production status [skip ci]" || echo "Commit failed"
+            git push || echo "Push failed (may be permission issue)"
+          else
+            echo "No hay cambios en el archivo de estado"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: 🐛 Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            let statusContent = '';
+            try {
+              statusContent = fs.readFileSync('docs/PRODUCTION_STATUS.md', 'utf8');
+            } catch (e) {
+              statusContent = 'No se pudo leer el archivo de estado.';
+            }
+            
+            // Buscar si ya existe un issue abierto con el mismo título
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'production-issue'
+            });
+            
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('⚠️ Producción') && 
+              issue.title.includes(new Date().toISOString().split('T')[0])
+            );
+            
+            if (existingIssue) {
+              // Actualizar issue existente
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `## 🔄 Actualización - ${new Date().toISOString()}\n\n${statusContent}\n\n---\n*Actualizado automáticamente por GitHub Actions*`
+              });
+              console.log(`Issue #${existingIssue.number} actualizado`);
+            } else {
+              // Crear nuevo issue
+              const { data: issue } = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `⚠️ Producción - Error Detectado ${new Date().toISOString().split('T')[0]}`,
+                body: `# ⚠️ Error Detectado en Producción\n\n## 📋 Detalles\n\n${statusContent}\n\n---\n*Issue creado automáticamente por GitHub Actions*\n*Workflow: [${{ github.workflow }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*`,
+                labels: ['production-issue', 'monitoring', 'bug']
+              });
+              console.log(`Issue #${issue.number} creado`);
+            }
