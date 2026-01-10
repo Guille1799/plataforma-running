@@ -45,9 +45,11 @@ setup_*.ps1
 # --- Documentación temporal ---
 *_SUMMARY.md
 *_STATUS.md
+!docs/PRODUCTION_STATUS.md  # Excepción: Archivo de estado de producción (actualizado por GitHub Actions)
 *_REPORT.md
 *_REPORT.txt
 *_GUIDE.md
+!docs/MONITORING_GUIDE.md  # Excepción: Guía de monitoreo (documentación permanente)
 *_CHECKLIST.md
 *_ANALYSIS.md
 *_STRATEGY.md
