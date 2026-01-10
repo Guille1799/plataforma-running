@@ -35,6 +35,7 @@ def get_athlete_profile(current_user: models.User = Depends(get_current_user)):
         vo2_max=current_user.vo2_max,
         birth_date=current_user.birth_date,
         gender=current_user.gender,
+        last_garmin_sync=current_user.last_garmin_sync,
     )
 
 

@@ -290,6 +290,9 @@ class AthleteProfileOut(BaseModel):
     birth_date: Optional[datetime] = None
     gender: Optional[str] = None
 
+    # Garmin sync information
+    last_garmin_sync: Optional[datetime] = None  # Timestamp of last successful Garmin sync
+
     class Config:
         from_attributes = True
 

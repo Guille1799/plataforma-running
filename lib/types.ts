@@ -76,6 +76,8 @@ export interface AthleteProfile {
   goals?: Goal[];
   injuries?: Injury[];
   preferences?: AthletePreferences;
+  // Garmin sync information
+  last_garmin_sync?: string; // ISO datetime string of last successful Garmin sync
 }
 
 // ============================================================================
