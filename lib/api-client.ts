@@ -1,7 +1,7 @@
 /**
  * api-client.ts - Centralized API client for backend communication
  */
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { enrichWorkouts } from './formatters';
 import type {
   AuthResponse,
@@ -35,6 +35,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 class APIClient {
   private client: AxiosInstance;
   private token: string | null = null;
+  private refreshTokenPromise: Promise<string> | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -56,17 +57,58 @@ class APIClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling with automatic token refresh
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<APIError>) => {
-        if (error.response?.status === 401) {
-          // Unauthorized - clear token and redirect to login
-          this.clearToken();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
+      async (error: AxiosError<APIError>) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig | undefined;
+        
+        // Only handle 401 errors (Unauthorized)
+        if (error.response?.status === 401 && originalRequest) {
+          // Check if this request was already retried to avoid infinite loops
+          const retryCount = (originalRequest as any)._retryCount || 0;
+          if (retryCount > 0) {
+            // Already retried, don't retry again
+            this.clearTokens();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+            return Promise.reject(error);
+          }
+          
+          // Mark this request as being retried
+          (originalRequest as any)._retryCount = 1;
+          // Avoid infinite loops - don't retry refresh endpoint
+          if (originalRequest.url?.includes('/api/v1/auth/refresh')) {
+            // Refresh token also expired, redirect to login
+            this.clearTokens();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+            return Promise.reject(error);
+          }
+
+          // Try to refresh the token
+          try {
+            const newAccessToken = await this.refreshAccessToken();
+            
+            // Update the original request with new token
+            if (originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            }
+            
+            // Retry the original request
+            return this.client(originalRequest);
+          } catch (refreshError) {
+            // Refresh failed, clear tokens and redirect to login
+            this.clearTokens();
+            if (typeof window !== 'undefined') {
+              window.location.href = '/login';
+            }
+            return Promise.reject(refreshError);
           }
         }
+
         return Promise.reject(error);
       }
     );
@@ -79,10 +121,31 @@ class APIClient {
     }
   }
 
+  setRefreshToken(refreshToken: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
+  }
+
+  getRefreshToken(): string | null {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('refresh_token');
+    }
+    return null;
+  }
+
   clearToken() {
     this.token = null;
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
+    }
+  }
+
+  clearTokens() {
+    this.token = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
     }
   }
 
@@ -97,6 +160,52 @@ class APIClient {
     return this.token;
   }
 
+  async refreshAccessToken(): Promise<string> {
+    // If there's already a refresh in progress, wait for it
+    if (this.refreshTokenPromise) {
+      return this.refreshTokenPromise;
+    }
+
+    // Start new refresh
+    this.refreshTokenPromise = (async () => {
+      try {
+        const refreshToken = this.getRefreshToken();
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+
+        // Use a fresh axios instance without interceptors for refresh endpoint
+        // This prevents infinite loops and ensures the refresh request doesn't get intercepted
+        const refreshClient = axios.create({
+          baseURL: API_BASE_URL,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const response = await refreshClient.post<AuthResponse>(
+          '/api/v1/auth/refresh',
+          { refresh_token: refreshToken }
+        );
+
+        // Update tokens in memory and localStorage
+        this.setToken(response.data.access_token);
+        this.setRefreshToken(response.data.refresh_token);
+
+        return response.data.access_token;
+      } catch (error) {
+        // If refresh fails, clear all tokens
+        this.clearTokens();
+        throw error;
+      } finally {
+        // Clear the promise so we can retry if needed
+        this.refreshTokenPromise = null;
+      }
+    })();
+
+    return this.refreshTokenPromise;
+  }
+
   // ============================================================================
   // AUTH
   // ============================================================================
@@ -104,12 +213,14 @@ class APIClient {
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/api/v1/auth/login', credentials);
     this.setToken(response.data.access_token);
+    this.setRefreshToken(response.data.refresh_token);
     return response.data;
   }
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await this.client.post<AuthResponse>('/api/v1/auth/register', data);
     this.setToken(response.data.access_token);
+    this.setRefreshToken(response.data.refresh_token);
     return response.data;
   }
 
@@ -119,7 +230,7 @@ class APIClient {
   }
 
   logout() {
-    this.clearToken();
+    this.clearTokens();
   }
 
   // ============================================================================
@@ -137,12 +248,6 @@ class APIClient {
 
     // Enrich workouts with computed properties for dashboard compatibility
     const enrichedWorkouts = enrichWorkouts(workoutsArray);
-
-    // Debug logging
-    if (typeof window !== 'undefined' && enrichedWorkouts.length > 0) {
-      console.log('🔍 API Client - First workout (raw):', workoutsArray[0]);
-      console.log('✅ API Client - First workout (enriched):', enrichedWorkouts[0]);
-    }
 
     return { workouts: enrichedWorkouts, total };
   }
@@ -594,8 +699,6 @@ class APIClient {
     maxDistance?: number,
     limit: number = 20
   ): Promise<any> {
-    console.log(`🔴 API CLIENT: Calling searchRaces with query="${query}", limit=${limit}`);
-
     try {
       const response = await this.client.get('/api/v1/events/races/search', {
         params: {
@@ -615,10 +718,6 @@ class APIClient {
           'Expires': '0',
         },
       });
-
-      console.log(`🟢 API CLIENT: Response received:`, response.data);
-      console.log(`🟢 API CLIENT: response.data.races length:`, response.data.races?.length);
-      console.log(`🟢 API CLIENT: Full race objects:`, response.data.races?.map((r: any) => ({ id: r.id, name: r.name })));
 
       return response.data;
     } catch (error) {

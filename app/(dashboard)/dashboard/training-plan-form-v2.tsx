@@ -91,18 +91,9 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('🔍 SEARCH DEBUG: Query string:', raceSearchQuery);
-        console.log('🔍 SEARCH DEBUG: Calling apiClient.searchRaces...');
-        
         const response = await apiClient.searchRaces(raceSearchQuery, undefined, undefined, undefined, undefined, undefined, 30);
         
-        console.log('📍 SEARCH DEBUG: Full API response:', response);
-        console.log('📍 SEARCH DEBUG: response.races exists?', !!response.races);
-        console.log('📍 SEARCH DEBUG: response.races length?', response.races?.length);
-        
         let races = response.races || [];
-        console.log(`📋 SEARCH DEBUG: races array BEFORE filter: ${races.length} items`);
-        console.log('📋 SEARCH DEBUG: races names:', races.map((r: any) => r.name));
         
         // FILTER: Show only FUTURE races (from today onwards)
         const today = new Date();
@@ -113,12 +104,7 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
           return raceDate >= today; // Only future races from today onwards
         });
         
-        console.log(`🏃 SEARCH DEBUG: races array AFTER date filter (future only): ${races.length} items`);
-        
-        console.log('🎯 SEARCH DEBUG: About to call setRaceSearchResults with:', races);
         setRaceSearchResults(races);
-        console.log('🎯 SEARCH DEBUG: setRaceSearchResults called');
-        
         setIsSearching(false);
       } catch (err) {
         console.error('❌ SEARCH ERROR:', err);
@@ -160,12 +146,10 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
           plan_duration_weeks: result.weeks,
           duration_recommendation: result.recommendation,
         }));
-        console.log('✅ Duration calculated:', result);
       }
     } catch (err) {
-      console.error('❌ Error calculating duration:', err);
+      console.error('Error calculating duration:', err);
       // Don't alert - just skip duration calculation and let user proceed
-      console.log('⚠️ Using default duration: 12 weeks');
       setFormData(prev => ({
         ...prev,
         plan_duration_weeks: 12,
@@ -313,7 +297,6 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
 
   // PASO 1: Carrera Objetivo (FIRST STEP)
   if (step === 1) {
-    console.log('🎯 STEP 1 - showRaceSearch:', showRaceSearch, 'raceSearchQuery:', raceSearchQuery, 'results:', raceSearchResults.length);
     return (
       <Card className="bg-slate-800 border-slate-700">
         <CardHeader>
@@ -383,7 +366,6 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
                   placeholder="Ej: Maratón de Madrid, 10K Barcelona..."
                   value={raceSearchQuery}
                   onChange={(e) => {
-                    console.log('📝 Input changed:', e.target.value);
                     setRaceSearchQuery(e.target.value);
                   }}
                   className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
@@ -844,7 +826,6 @@ export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: an
                   key={idx}
                   onClick={() => {
                     const newValue = idx === 1;
-                    console.log('🔄 Cross-training clicked:', option, 'newValue:', newValue);
                     setFormData({ 
                       ...formData, 
                       include_cross_training: newValue,

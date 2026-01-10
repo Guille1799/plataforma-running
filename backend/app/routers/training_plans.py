@@ -5,8 +5,7 @@ Endpoints for AI-generated personalized training plans.
 Supports multi-week plan generation, adaptation, and tracking.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
@@ -14,14 +13,16 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.models import User
-from app.security import verify_token
-from app.core.config import settings
 from app.services.training_plan_service import get_training_plan_service
+from app.utils.rate_limiter import limiter
+from app.dependencies.auth import get_current_user
 from app import schemas
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/training-plans", tags=["training-plans"])
-security_scheme = HTTPBearer()
 
 # Lazy loading wrapper
 _training_plan_service = None
@@ -31,25 +32,6 @@ def _get_training_plan_service():
     if _training_plan_service is None:
         _training_plan_service = get_training_plan_service()
     return _training_plan_service
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    from app import crud
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 # ==================== Schemas ====================
@@ -138,8 +120,10 @@ class PlanSummary(BaseModel):
 # ==================== Endpoints ====================
 
 @router.post("/generate", response_model=PlanResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/hour")
 def generate_training_plan(
-    request: GeneratePlanRequest,
+    request: Request,
+    plan_request: GeneratePlanRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -148,21 +132,23 @@ def generate_training_plan(
     """
     try:
         # Log validated request
-        print(f"\n{'='*60}")
-        print(f"DEBUG: Request VALIDATED by Pydantic:")
-        print(f"  goal_type: {request.goal_type} (type: {type(request.goal_type).__name__})")
-        print(f"  goal_date: {request.goal_date} (type: {type(request.goal_date).__name__}, tzinfo: {request.goal_date.tzinfo})")
-        print(f"  current_weekly_km: {request.current_weekly_km} (type: {type(request.current_weekly_km).__name__})")
-        print(f"  weeks: {request.weeks} (type: {type(request.weeks).__name__})")
-        print(f"  notes: {request.notes}")
-        print(f"  current_user: {current_user.email} (id: {current_user.id})")
-        print(f"{'='*60}\n")
+        logger.debug(
+            "Training plan generation request validated",
+            extra={
+                "user_id": current_user.id,
+                "user_email": current_user.email,
+                "goal_type": plan_request.goal_type,
+                "goal_date": plan_request.goal_date.isoformat() if plan_request.goal_date else None,
+                "current_weekly_km": plan_request.current_weekly_km,
+                "weeks": plan_request.weeks,
+            }
+        )
         
         # Validate goal date is in the future
         # Handle both naive and aware datetime objects
         from datetime import timezone
         now = datetime.now(timezone.utc)
-        goal_date = request.goal_date
+        goal_date = plan_request.goal_date
         
         # Convert naive datetime to aware if needed
         if goal_date.tzinfo is None:
@@ -177,25 +163,25 @@ def generate_training_plan(
         # Validate weeks fit within goal date
         weeks_until_goal = (goal_date - now).days / 7
         weeks_until_goal_floor = int(weeks_until_goal)  # Use floor for validation (same as frontend)
-        if request.weeks > weeks_until_goal_floor:
+        if plan_request.weeks > weeks_until_goal_floor:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cannot create {request.weeks}-week plan for goal {weeks_until_goal_floor} weeks away (days_left: {(goal_date - now).days})"
+                detail=f"Cannot create {plan_request.weeks}-week plan for goal {weeks_until_goal_floor} weeks away (days_left: {(goal_date - now).days})"
             )
         
         # Generate plan
         goal = {
-            "type": request.goal_type,
-            "date": request.goal_date.isoformat(),  # Convert to ISO string for JSON serialization
-            "current_weekly_km": request.current_weekly_km,
-            "notes": request.notes
+            "type": plan_request.goal_type,
+            "date": plan_request.goal_date.isoformat(),  # Convert to ISO string for JSON serialization
+            "current_weekly_km": plan_request.current_weekly_km,
+            "notes": plan_request.notes
         }
         
         plan = _get_training_plan_service().generate_plan(
             db=db,
             user=current_user,
             goal=goal,
-            weeks=request.weeks
+            weeks=plan_request.weeks
         )
         
         # Store plan in user preferences
@@ -210,22 +196,16 @@ def generate_training_plan(
         plan["current_week"] = 1
         plan["start_date"] = datetime.now(timezone.utc).isoformat()  # Plan starts today
         
-        print(f"\n{'='*60}")
-        print(f"💾 STORING PLAN IN DATABASE")
-        print(f"Plan ID: {plan.get('plan_id')}")
-        print(f"Plan Keys: {list(plan.keys())}")
-        print(f"{'='*60}\n")
-        
-        print(f"Before append - Plan dict keys: {list(plan.keys())}")
-        print(f"Before append - Plan ID value: {plan.get('plan_id')}")
-        print(f"Before append - Plan ID type: {type(plan.get('plan_id'))}")
+        logger.debug(
+            "Storing training plan in database",
+            extra={
+                "user_id": current_user.id,
+                "plan_id": plan.get("plan_id"),
+                "plan_name": plan.get("plan_name"),
+            }
+        )
         
         current_user.preferences["training_plans"].append(plan)
-        
-        print(f"After append but before commit:")
-        print(f"  - List length: {len(current_user.preferences['training_plans'])}")
-        print(f"  - Last item keys: {list(current_user.preferences['training_plans'][-1].keys())}")
-        print(f"  - Last item plan_id: {current_user.preferences['training_plans'][-1].get('plan_id')}")
         
         # CRITICAL: Tell SQLAlchemy that the JSON column has changed
         from sqlalchemy.orm.attributes import flag_modified
@@ -236,15 +216,14 @@ def generate_training_plan(
         # CRITICAL: Refresh the user object from database to see what was actually persisted
         db.refresh(current_user)
         
-        print(f"\n{'='*60}")
-        print(f"✅ PLAN STORED - Verifying...")
-        print(f"Total plans in preferences: {len(current_user.preferences['training_plans'])}")
-        if current_user.preferences['training_plans']:
-            last_plan = current_user.preferences['training_plans'][-1]
-            print(f"Last plan dict: {last_plan}")
-            print(f"Last plan ID: {last_plan.get('plan_id')}")
-            print(f"Last plan keys: {list(last_plan.keys())}")
-        print(f"{'='*60}\n")
+        logger.info(
+            "Training plan stored successfully",
+            extra={
+                "user_id": current_user.id,
+                "plan_id": plan.get("plan_id"),
+                "total_plans": len(current_user.preferences.get("training_plans", [])),
+            }
+        )
         
         return PlanResponse(
             success=True,
@@ -261,10 +240,12 @@ def generate_training_plan(
             detail=str(e)
         )
     except Exception as e:
-        import traceback
         error_msg = f"Failed to generate training plan: {str(e)}"
-        traceback.print_exc()
-        print(f"DEBUG: Error details: {error_msg}")
+        logger.error(
+            "Failed to generate training plan",
+            extra={"user_id": current_user.id, "error": str(e)},
+            exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg
@@ -403,12 +384,20 @@ def list_training_plans(
                 ))
             except (ValueError, KeyError, TypeError) as e:
                 # Log and skip malformed plan
-                print(f"⚠️ Skipping malformed plan: {str(e)}")
+                logger.warning(
+                    "Skipping malformed training plan",
+                    extra={"user_id": current_user.id, "error": str(e)},
+                    exc_info=True
+                )
                 continue
         
         return summaries
     except Exception as e:
-        print(f"❌ Error in list_training_plans: {str(e)}")
+        logger.error(
+            "Error listing training plans",
+            extra={"user_id": current_user.id, "error": str(e)},
+            exc_info=True
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Error listing training plans: {str(e)}"
@@ -464,10 +453,11 @@ def adapt_training_plan(
         plan_start = datetime.fromisoformat(original_plan["created_at"]) if isinstance(original_plan["created_at"], str) else original_plan["created_at"]
         
         from app.models import Workout
+        from sqlalchemy.orm import joinedload
         actual_workouts = db.query(Workout).filter(
             Workout.user_id == current_user.id,
             Workout.start_time >= plan_start
-        ).order_by(Workout.start_time.desc()).all()
+        ).options(joinedload(Workout.user)).order_by(Workout.start_time.desc()).all()
         
         # Adapt the plan
         adapted_plan = _get_training_plan_service().adapt_plan(

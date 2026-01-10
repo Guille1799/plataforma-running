@@ -51,6 +51,7 @@ def create_user(db: Session, user_data: dict) -> models.User:
         email=user_data["email"],
         name=user_data["name"],
         hashed_password=hashed_password,
+        role="user",  # New users default to 'user' role
     )
 
     db.add(db_user)
@@ -181,7 +182,9 @@ def get_user_workout_stats(db: Session, user_id: int) -> schemas.WorkoutStats:
     Returns:
         WorkoutStats object with aggregated data
     """
-    workouts = db.query(models.Workout).filter(models.Workout.user_id == user_id).all()
+    workouts = db.query(models.Workout).filter(
+        models.Workout.user_id == user_id
+    ).options(joinedload(models.Workout.user)).all()
 
     if not workouts:
         return schemas.WorkoutStats(

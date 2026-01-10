@@ -21,6 +21,7 @@ from cryptography.fernet import Fernet
 from .. import models, crud
 from ..core.config import settings
 
+logger = logging.getLogger(__name__)
 
 # Encryption key (should be in settings)
 # Generate a Fernet-compatible key from secret_key
@@ -123,7 +124,7 @@ def connect_user_garmin(
     """
     # Note: We don't verify credentials here to avoid blocking on Garmin's OAuth
     # Verification happens during first sync when we actually need the connection
-    print(f"[GARMIN] Storing credentials for {email}")
+    logger.info(f"Storing Garmin credentials for {email}", extra={"user_id": user_id})
 
     # Store email + encrypted password (most reliable for garth re-auth)
     credentials = json.dumps({"email": email, "password": password})
@@ -138,7 +139,7 @@ def connect_user_garmin(
     db.commit()
     db.refresh(user)
 
-    print(f"[GARMIN] Credentials stored for user {user_id}")
+    logger.info(f"Garmin credentials stored for user {user_id}")
     return user
 
 
@@ -569,16 +570,19 @@ def sync_user_activities(
     Returns:
         List of created Workout models
     """
-    print(f"[SYNC] Starting sync for user {user_id}, dates: {start_date} to {end_date}")
+    logger.info(
+        "Starting Garmin sync",
+        extra={"user_id": user_id, "start_date": str(start_date), "end_date": str(end_date)}
+    )
 
     # Get user to check if first sync
     user = crud.get_user_by_id(db, user_id)
     is_first_sync = user.last_garmin_sync is None
 
     # Get Garmin API
-    print("[SYNC] Calling get_user_garmin_api...")
+    logger.debug("Calling get_user_garmin_api", extra={"user_id": user_id})
     api = get_user_garmin_api(db, user_id)
-    print("[SYNC] API obtained successfully")
+    logger.debug("Garmin API obtained successfully", extra={"user_id": user_id})
 
     # Sync user profile, zones, and settings
     sync_user_zones_and_profile(db, user_id, api)
@@ -590,14 +594,14 @@ def sync_user_activities(
         if is_first_sync:
             # First sync: get last 2 years
             start_date = end_date - timedelta(days=730)
-            print(f"[SYNC] First sync detected - pulling 2 years of history")
+            logger.info("First sync detected - pulling 2 years of history", extra={"user_id": user_id})
         else:
             # Subsequent syncs: from last sync date
             if user.last_garmin_sync:
                 start_date = user.last_garmin_sync.date()
             else:
                 start_date = end_date - timedelta(days=30)
-            print(f"[SYNC] Incremental sync from {start_date}")
+            logger.info(f"Incremental sync from {start_date}", extra={"user_id": user_id, "start_date": str(start_date)})
 
     # Fetch activities with high limit to get all activities
     # Note: get_activities() is more reliable than get_activities_by_date() which has internal limits
@@ -610,7 +614,10 @@ def sync_user_activities(
         if start_date <= date.fromisoformat(act["startTimeLocal"][:10]) <= end_date
     ]
 
-    print(f"[SYNC] Found {len(activities)} activities from Garmin in date range")
+    logger.info(
+        f"Found {len(activities)} activities from Garmin in date range",
+        extra={"user_id": user_id, "activity_count": len(activities)}
+    )
 
     created_workouts = []
     skipped_count = 0
@@ -619,7 +626,10 @@ def sync_user_activities(
     for activity_dict in activities:
         # Stop if we reach 1000 workouts
         if len(created_workouts) + skipped_count >= max_to_import:
-            print(f"[SYNC] Reached max import limit of {max_to_import}")
+            logger.warning(
+                f"Reached max import limit of {max_to_import}",
+                extra={"user_id": user_id, "max_limit": max_to_import}
+            )
             break
 
         activity_type = activity_dict.get("activityType", {}).get("typeKey", "")
@@ -750,7 +760,10 @@ def sync_garmin_activities(db: Session, user_id: int) -> List[models.Workout]:
         for activity_dict in activities:
             # Stop if we reach 1000 workouts
             if len(created_workouts) + skipped_count >= max_to_import:
-                print(f"[SYNC] Reached max import limit of {max_to_import}")
+                logger.warning(
+                f"Reached max import limit of {max_to_import}",
+                extra={"user_id": user_id, "max_limit": max_to_import}
+            )
                 break
 
             activity_type = activity_dict.get("activityType", {}).get("typeKey", "")
@@ -814,7 +827,11 @@ def sync_garmin_activities(db: Session, user_id: int) -> List[models.Workout]:
                 created_workouts.append(workout)
 
             except Exception as e:
-                print(f"Error processing activity {activity_id}: {e}")
+                logger.warning(
+                    f"Error processing activity {activity_id}",
+                    extra={"user_id": user_id, "activity_id": activity_id, "error": str(e)},
+                    exc_info=True
+                )
                 skipped_count += 1
                 continue
 
@@ -822,10 +839,19 @@ def sync_garmin_activities(db: Session, user_id: int) -> List[models.Workout]:
         user.last_garmin_sync = datetime.utcnow()
         db.commit()
 
-        print(
-            f"[SYNC] Completed. Created: {len(created_workouts)}, Skipped: {skipped_count}"
+        logger.info(
+            f"Garmin sync completed. Created: {len(created_workouts)}, Skipped: {skipped_count}",
+            extra={
+                "user_id": user_id,
+                "created_count": len(created_workouts),
+                "skipped_count": skipped_count,
+            }
         )
         return created_workouts
     except Exception as e:
-        print(f"[SYNC] Error during sync: {e}")
+        logger.error(
+            "Error during Garmin sync",
+            extra={"user_id": user_id, "error": str(e)},
+            exc_info=True
+        )
         return []

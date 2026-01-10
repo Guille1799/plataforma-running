@@ -1,0 +1,54 @@
+{
+  "agents": {
+    "agent-1": {
+      "id": "agent-1",
+      "status": "active",
+      "current_task": "Revisión completa del proyecto - COMPLETADO",
+      "files_being_edited": [],
+      "tasks_completed": [
+        "security-secret-key",
+        "security-roles-enum",
+        "security-ownership",
+        "security-cors",
+        "security-refresh-token",
+        "security-rate-limiting",
+        "code-centralize-auth-workouts",
+        "code-centralize-auth-events",
+        "code-centralize-auth-coach",
+        "code-centralize-auth-training-plans",
+        "code-centralize-auth-health",
+        "code-centralize-auth-profile",
+        "code-centralize-auth-onboarding",
+        "code-centralize-auth-garmin",
+        "code-centralize-auth-strava",
+        "code-centralize-auth-upload",
+        "code-centralize-auth-hrv",
+        "code-centralize-auth-overtraining",
+        "code-centralize-auth-predictions",
+        "code-centralize-auth-race-prediction-enhanced",
+        "code-centralize-auth-training-recommendations",
+        "code-centralize-auth-integrations",
+        "code-centralize-auth",
+        "code-cleanup-logging",
+        "code-cleanup-files",
+        "code-migrate-alembic",
+        "code-cleanup-todos",
+        "performance-composite-indexes",
+        "performance-nplusone"
+      ],
+      "tasks_in_progress": [],
+      "next_task": "Completado - Revisar plan completo"
+    },
+    "agent-2": {
+      "id": "agent-2",
+      "status": "unknown",
+      "current_task": "?",
+      "files_being_edited": [],
+      "tasks_completed": [],
+      "tasks_in_progress": [],
+      "next_task": "?"
+    }
+  },
+  "files_locked": [],
+  "last_update": "2026-01-10T20:04:09Z"
+}

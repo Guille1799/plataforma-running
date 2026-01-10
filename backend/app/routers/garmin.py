@@ -4,18 +4,16 @@ Garmin Connect integration endpoints.
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from ..database import get_db
 from ..services import garmin_service
-from .. import security
-from ..core.config import settings
+from .. import models
+from ..dependencies.auth import get_current_user
 
 
 router = APIRouter(prefix="/api/v1/garmin")
-security_scheme = HTTPBearer()
 
 
 class GarminConnectRequest(BaseModel):
@@ -38,27 +36,10 @@ class GarminStatusResponse(BaseModel):
     last_sync: Optional[str] = None
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> int:
-    """Extract user ID from JWT token."""
-    token = credentials.credentials
-    payload = security.verify_token(token, settings.secret_key, settings.algorithm)
-    
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token"
-        )
-    
-    return int(payload.get('sub'))
-
-
 @router.post("/connect", status_code=200)
 def connect_garmin(
     request: GarminConnectRequest,
-    user_id: int = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -69,7 +50,7 @@ def connect_garmin(
     try:
         user = garmin_service.connect_user_garmin(
             db,
-            user_id,
+            current_user.id,
             request.email,
             request.password
         )
@@ -89,7 +70,7 @@ def connect_garmin(
 @router.post("/sync", status_code=200)
 def sync_activities(
     request: Optional[GarminSyncRequest] = None,
-    user_id: int = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -117,10 +98,16 @@ def sync_activities(
         # Sync
         workouts = garmin_service.sync_user_activities(
             db,
-            user_id,
+            current_user.id,
             start_date,
             end_date
         )
+        
+        # Update last sync time
+        from datetime import datetime
+        if current_user and len(workouts) > 0:  # Only update if sync was successful (workouts synced)
+            current_user.last_garmin_sync = datetime.utcnow()
+            db.commit()
         
         return {
             "message": f"Synced {len(workouts)} activities",
@@ -128,8 +115,9 @@ def sync_activities(
             "activity_ids": [w.id for w in workouts]
         }
     except Exception as e:
-        import traceback
-        print(f"[SYNC ERROR] {traceback.format_exc()}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Garmin sync failed for user {current_user.id}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Sync failed: {str(e)}"
@@ -138,41 +126,27 @@ def sync_activities(
 
 @router.get("/status", response_model=GarminStatusResponse)
 def get_garmin_status(
-    user_id: int = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get Garmin connection status for current user."""
-    from .. import crud
-    
-    user = crud.get_user_by_id(db, user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
     return {
-        "connected": bool(user.garmin_token),
-        "garmin_email": user.garmin_email,
-        "connected_at": user.garmin_connected_at.isoformat() if user.garmin_connected_at else None,
-        "last_sync": None  # TODO: Track last sync time
+        "connected": bool(current_user.garmin_token),
+        "garmin_email": current_user.garmin_email,
+        "connected_at": current_user.garmin_connected_at.isoformat() if current_user.garmin_connected_at else None,
+        "last_sync": current_user.last_garmin_sync.isoformat() if current_user.last_garmin_sync else None
     }
 
 
 @router.delete("/disconnect", status_code=200)
 def disconnect_garmin(
-    user_id: int = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Disconnect Garmin account."""
-    from .. import crud
-    
-    user = crud.get_user_by_id(db, user_id)
-    
-    user.garmin_email = None
-    user.garmin_token = None
-    user.garmin_connected_at = None
+    current_user.garmin_email = None
+    current_user.garmin_token = None
+    current_user.garmin_connected_at = None
     
     db.commit()
     

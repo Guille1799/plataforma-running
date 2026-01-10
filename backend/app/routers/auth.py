@@ -1,13 +1,14 @@
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, Field
 
 from .. import crud, models, security
 from ..database import get_db
 from ..core.config import settings
+from ..utils.rate_limiter import limiter
+from ..dependencies.auth import get_current_user
 
 
 class UserCreate(BaseModel):
@@ -69,7 +70,12 @@ router = APIRouter()
 
 
 @router.post("/api/v1/auth/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register_user(user: UserCreate, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("5/15minutes")
+def register_user(
+    request: Request,
+    user: UserCreate,
+    db: Session = Depends(get_db)
+) -> TokenResponse:
     """Register a new user and return JWT tokens.
     
     Args:
@@ -115,7 +121,12 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)) -> TokenRespo
 
 
 @router.post("/api/v1/auth/login", response_model=TokenResponse)
-def login_user(credentials: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+@limiter.limit("5/15minutes")
+def login_user(
+    request: Request,
+    credentials: LoginRequest,
+    db: Session = Depends(get_db)
+) -> TokenResponse:
     """Login user and return JWT tokens.
     
     Args:
@@ -234,40 +245,16 @@ def refresh_token_endpoint(
 
 @router.get("/api/v1/auth/me", response_model=UserOut)
 def get_current_user_info(
-    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
-    db: Session = Depends(get_db)
+    current_user: models.User = Depends(get_current_user),
 ) -> UserOut:
     """Get current authenticated user information.
     
+    Uses the centralized get_current_user dependency for consistency.
+    
     Args:
-        credentials: Bearer token from Authorization header
-        db: Database session
+        current_user: Current authenticated user (injected by dependency)
         
     Returns:
         Current user information
     """
-    from .. import security
-    
-    # Extract token
-    token = credentials.credentials
-    
-    # Verify token
-    payload = security.verify_token(token, secret_key=settings.secret_key, algorithm=settings.algorithm)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
-    
-    # Get user ID from token
-    user_id = int(payload.get("sub"))
-    
-    # Get user from database
-    db_user = crud.get_user_by_id(db, user_id=user_id)
-    if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-    
-    return UserOut.model_validate(db_user)
+    return UserOut.model_validate(current_user)

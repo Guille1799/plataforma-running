@@ -63,7 +63,6 @@ export function useDurationOptions() {
   ): Promise<DurationOption[] | null> => {
     // Prevent infinite loops - check if we already have data
     if (state.data && state.data.length > 0) {
-      console.log('✅ Duration options already cached for', goalType);
       return state.data;
     }
 

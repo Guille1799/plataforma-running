@@ -35,6 +35,7 @@ test_*.py
 debug_*.py
 *_results.txt
 *.backup
+*.bak
 sample_*.gpx
 sample_*.fit
 token.txt

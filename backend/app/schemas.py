@@ -13,6 +13,12 @@ from enum import Enum
 # ============================================================================
 
 
+class UserRole(str, Enum):
+    """User role enumeration for authorization."""
+    ADMIN = "admin"
+    USER = "user"
+
+
 class UserCreate(BaseModel):
     """Schema para registro de nuevo usuario."""
 
@@ -27,6 +33,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+    role: UserRole = UserRole.USER
     created_at: datetime
 
     class Config:

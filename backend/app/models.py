@@ -9,6 +9,7 @@ from sqlalchemy import (
     JSON,
     Date,
     UniqueConstraint,
+    Index,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -45,6 +46,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    role = Column(String, nullable=False, default="user", index=True)  # user, admin
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Garmin Connect integration fields
@@ -207,6 +209,14 @@ class Workout(Base):
     file_name = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Composite indexes for common query patterns
+    # Index (user_id, start_time) for queries filtering by user and ordering by date
+    # Index on start_time alone for date range queries
+    __table_args__ = (
+        Index('ix_workouts_user_id_start_time', 'user_id', 'start_time'),
+        Index('ix_workouts_start_time', 'start_time'),
+    )
+
     # Relationships
     user = relationship("User", back_populates="workouts")
 
@@ -233,6 +243,12 @@ class ChatMessage(Base):
     content = Column(String, nullable=False)
     tokens_used = Column(Integer, nullable=True)  # Only for assistant messages
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Composite indexes for common query patterns
+    # Index (user_id, created_at) for queries filtering by user and ordering by date
+    __table_args__ = (
+        Index('ix_chat_messages_user_id_created_at', 'user_id', 'created_at'),
+    )
 
 
 class HealthMetric(Base):
@@ -336,7 +352,13 @@ class HealthMetric(Base):
     data_quality = Column(String, nullable=False, default="basic")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    __table_args__ = (UniqueConstraint("user_id", "date", name="uix_user_date_health"),)
+    # Composite indexes for common query patterns
+    # UniqueConstraint already creates an index on (user_id, date), but we add explicit indexes
+    # for better query optimization when filtering by user and date ranges
+    __table_args__ = (
+        UniqueConstraint("user_id", "date", name="uix_user_date_health"),
+        Index('ix_health_metrics_user_id_date', 'user_id', 'date'),
+    )
 
 
 class Event(Base):
@@ -384,4 +406,12 @@ class Event(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+    # Composite indexes for common query patterns
+    # Index (date, verified) for queries filtering future verified events
+    # Index (country, date) for location-based searches
+    __table_args__ = (
+        Index('ix_events_date_verified', 'date', 'verified'),
+        Index('ix_events_country_date', 'country', 'date'),
     )

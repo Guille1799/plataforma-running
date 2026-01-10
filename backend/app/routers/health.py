@@ -3,7 +3,6 @@ Health Metrics Router
 Endpoints for syncing and managing health/wellness data
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime, timedelta
@@ -11,34 +10,14 @@ from pydantic import BaseModel, Field
 
 from .. import models, crud
 from ..database import get_db
-from ..security import verify_token
-from ..core.config import settings
 from ..services.garmin_health_service import garmin_health_service
 from ..services.google_fit_service import google_fit_service
 from ..services.apple_health_service import apple_health_service
-from ..services.coach_service import coach_service
+from ..services.coach_service import get_coach_service
+from ..dependencies.auth import get_current_user
 
 
 router = APIRouter(prefix="/api/v1/health", tags=["health"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 # ========================================================================
@@ -199,6 +178,7 @@ async def get_readiness_score(
     ).first()
     
     # Calculate readiness
+    coach_service = get_coach_service()
     readiness = coach_service.calculate_readiness_score(health, current_user)
     
     return readiness
@@ -214,6 +194,7 @@ async def get_workout_recommendation(
     
     Considers readiness score, recent training, goals, and health metrics.
     """
+    coach_service = get_coach_service()
     recommendation = coach_service.generate_health_aware_recommendation(
         db, 
         current_user

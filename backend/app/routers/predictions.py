@@ -6,39 +6,17 @@ Also provides training pace zones based on current fitness.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.models import User
-from app.security import verify_token
-from app.core.config import settings
+from app import models
 from app.services.race_predictor_service import RacePredictorService
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/predictions", tags=["predictions"])
 race_predictor_service = RacePredictorService()
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    from app import crud
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 # ==================== Schemas ====================
@@ -164,7 +142,7 @@ class VDOTCalculateRequest(BaseModel):
 @router.post("/vdot", response_model=VDOTResponse)
 def calculate_vdot_post(
     request: VDOTCalculateRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Calculate VDOT (VO2max equivalent) from a race performance via POST.
@@ -224,7 +202,7 @@ def calculate_vdot_post(
 @router.get("/vdot", response_model=VDOTResponse)
 def predict_race_times(
     request: PredictRacesRequest = None,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -310,7 +288,7 @@ def predict_race_times(
 def calculate_vdot(
     distance_km: float = Query(..., ge=1.0, le=100.0, description="Race distance in kilometers"),
     time_minutes: float = Query(..., ge=1.0, le=600.0, description="Race time in minutes"),
-    current_user: User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Calculate VDOT (VO2max equivalent) from a race performance.
@@ -371,7 +349,7 @@ def calculate_vdot(
 @router.get("/training-paces", response_model=TrainingPaces)
 def get_training_paces(
     vdot: float = Query(..., ge=20.0, le=90.0, description="VDOT score (use /vdot endpoint to calculate)"),
-    current_user: User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Get training pace zones based on VDOT.
@@ -414,7 +392,7 @@ def get_training_paces(
 
 @router.get("/distances")
 def get_supported_distances(
-    current_user: User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Get list of supported race distances for predictions.

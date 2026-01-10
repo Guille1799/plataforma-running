@@ -19,10 +19,6 @@ export default function LoginPage() {
     e.preventDefault();
     e.stopPropagation(); // Prevenir cualquier propagación del evento
     
-    console.log('=== LOGIN FORM SUBMITTED ===');
-    console.log('Email:', email);
-    console.log('Password length:', password.length);
-    
     // Validación básica
     if (!email || !password) {
       setError('Por favor completa todos los campos');
@@ -33,9 +29,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      console.log('Calling login...');
       await login({ email, password });
-      console.log('Login successful!');
     } catch (err: any) {
       console.error('Login error:', err);
       console.error('Error response:', err.response);
@@ -60,7 +54,6 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoading(false);
-      console.log('=== LOGIN FORM FINISHED ===');
     }
   };
 

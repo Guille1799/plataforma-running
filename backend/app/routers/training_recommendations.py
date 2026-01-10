@@ -3,43 +3,22 @@ Training Recommendations API Router
 Endpoints for AI-powered adaptive training plans
 """
 from fastapi import APIRouter, Depends, Query, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime
 
 from app.database import get_db
-from app import models, crud
-from app.security import verify_token
-from app.core.config import settings
+from app import models
 from app.services.training_recommendations_service import (
     TrainingRecommendationsService,
     TrainingPhase,
     IntensityZone,
 )
+from app.dependencies.auth import get_current_user
 
 
 router = APIRouter(prefix="/api/v1/training", tags=["training-recommendations"])
 training_service = TrainingRecommendationsService()
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 @router.get("/weekly-plan")

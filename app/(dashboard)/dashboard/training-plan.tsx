@@ -207,8 +207,9 @@ export function TrainingPlanGenerator() {
                   </button>
                   <button
                     onClick={() => {
-                      // TODO: Guardar plan
-                      alert('Plan guardado! Consultalo en tu perfil.');
+                      // Note: This is a demo component. For real plan generation with auto-save,
+                      // use the TrainingPlanForm component which calls /api/v1/training-plans/generate
+                      alert('Este es un componente de ejemplo. Para generar un plan real que se guarde automáticamente, usa el formulario completo de planes de entrenamiento.');
                     }}
                     className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                   >

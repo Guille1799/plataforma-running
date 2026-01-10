@@ -63,10 +63,7 @@ export default function NewWorkoutPage() {
         ...(formData.avg_cadence > 0 && { avg_cadence: formData.avg_cadence }),
       };
 
-      console.log('Enviando workout:', payload);
-
       const response = await apiClient.createWorkout(payload);
-      console.log('Respuesta:', response);
 
       router.push('/workouts');
     } catch (err: any) {

@@ -3,7 +3,6 @@ routers/workouts.py - Endpoints para gestionar entrenamientos y FIT files
 """
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import fitparse
@@ -12,33 +11,13 @@ from datetime import datetime
 
 from .. import crud, schemas, models
 from ..database import get_db
-from ..security import verify_token
-from ..core.config import settings
+from ..utils.permissions import verify_resource_ownership
+from ..dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/api/v1/workouts",
     tags=["Workouts"],
 )
-
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db),
-) -> models.User:
-    """Extraer usuario actual desde JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    user_id = int(payload.get("sub"))
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    return user
 
 
 @router.post(
@@ -208,9 +187,7 @@ def get_workout(
         HTTPException 404: Si el entrenamiento no existe o no pertenece al usuario
     """
     workout = crud.get_workout_by_id(db, workout_id)
-
-    if not workout or workout.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Workout not found")
+    verify_resource_ownership(workout, current_user.id, "Workout")
 
     return schemas.WorkoutOut.model_validate(workout)
 

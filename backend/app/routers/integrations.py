@@ -4,14 +4,13 @@ Handles configuration and management of multiple connected devices
 """
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 import logging
 
 from ..database import get_db
-from ..models import User
+from .. import models
 from ..schemas import (
     DeviceIntegrationCreate,
     DeviceIntegrationUpdate,
@@ -20,39 +19,11 @@ from ..schemas import (
     DeviceIntegration,
     DeviceSyncConfig,
 )
-from ..security import verify_token
-from ..core.config import settings
+from ..dependencies.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/profile/integrations", tags=["integrations"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    """Get current authenticated user."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials"
-        )
-    
-    user_id = int(payload.get('sub'))
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    return user
 
 # Device type configuration defaults
 DEVICE_DEFAULTS = {
@@ -123,7 +94,7 @@ def build_device_integration(device_id: str, device_type: str, sync_config: dict
 
 @router.get("", response_model=DeviceIntegrationList)
 async def list_integrations(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -155,7 +126,7 @@ async def list_integrations(
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=DeviceIntegration)
 async def add_integration(
     request: DeviceIntegrationCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -231,7 +202,7 @@ async def add_integration(
 async def update_integration(
     device_id: str,
     request: DeviceIntegrationUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -289,7 +260,7 @@ async def update_integration(
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_integration(
     device_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -350,7 +321,7 @@ async def remove_integration(
 @router.get("/{device_id}/sync-status", response_model=DeviceSyncStatus)
 async def get_sync_status(
     device_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -400,7 +371,7 @@ async def get_sync_status(
 @router.post("/{device_id}/set-primary")
 async def set_primary_device(
     device_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -442,7 +413,7 @@ async def set_primary_device(
 
 @router.post("/sync-all")
 async def sync_all_devices(
-    current_user: User = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """

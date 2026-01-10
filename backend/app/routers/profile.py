@@ -3,42 +3,15 @@ profile.py - Endpoints para gestión de perfil de atleta y objetivos
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List
 import json
 
-from app import models, schemas, security
+from app import models, schemas
 from app.database import get_db
-from app.core.config import settings
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/profile", tags=["Athlete Profile"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db),
-) -> models.User:
-    """Get current authenticated user."""
-    token = credentials.credentials
-    payload = security.verify_token(token, settings.secret_key, settings.algorithm)
-
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        )
-
-    user_id = int(payload.get("sub"))
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
-    return user
 
 
 # ============================================================================

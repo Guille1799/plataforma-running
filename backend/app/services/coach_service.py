@@ -1692,9 +1692,3 @@ def get_coach_service() -> "CoachService":
         _coach_service_instance = CoachService()
     return _coach_service_instance
 
-
-# Backwards compatibility alias
-@property
-def coach_service():
-    """Deprecated: Use get_coach_service() instead."""
-    return get_coach_service()

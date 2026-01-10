@@ -343,3 +343,170 @@ Antes de marcar algo como completo:
 - [ ] Explicación simple proporcionada
 - [ ] Confirmación del usuario recibida
 - [ ] **Flujo de trabajo correcto seguido (ASK → PLAN → AGENT)**
+- [ ] **Coordinación con otros agents verificada (si aplica)**
+
+## 🤝 COORDINACIÓN MÚLTIPLE DE AGENTS
+
+**⚠️ CRÍTICO: Si hay múltiples agents trabajando simultáneamente, SIEMPRE seguir este protocolo.**
+
+### Sistema de Coordinación Permanente
+
+**⚠️ LECTURA OBLIGATORIA:**
+1. **SIEMPRE leer `scripts/agent-coordination.md`** antes de trabajar con múltiples agents
+2. Este archivo contiene la guía completa y ejemplos detallados
+3. Consultarlo para dividir tareas, entender protocolos y resolver dudas
+
+**Archivos del Sistema:**
+- `.agent-lock.json` - Estado compartido de locks y tareas (leer ANTES de cada edición)
+- `scripts/agent-coordination.md` - Guía detallada de uso (leer AL INICIO del trabajo conjunto)
+
+**Este sistema es PERMANENTE y funciona para:**
+- ✅ Cualquier plan (no solo el plan actual)
+- ✅ Cualquier tarea (refactoring, features, bugs, etc.)
+- ✅ Cualquier número de agents (2, 3, 4+)
+- ✅ Trabajo simultáneo permanente
+
+### Protocolo OBLIGATORIO Antes de Editar Archivos
+
+**PASO 0: Leer Documentación (SIEMPRE)**
+1. Leer `scripts/agent-coordination.md` para entender el protocolo completo
+2. Leer `.agent-lock.json` para verificar estado actual de otros agents
+3. Identificar tu agent ID (agent-1, agent-2, etc.) según el contexto
+
+**PASO 1: Verificar Locks (SIEMPRE)**
+1. Leer `.agent-lock.json` antes de editar CUALQUIER archivo
+2. Verificar que el archivo NO esté en `files_being_edited` de otro agent
+3. Si está siendo editado, ESPERAR o elegir otro archivo/tarea
+4. Consultar `scripts/agent-coordination.md` si hay dudas sobre división de trabajo
+
+**PASO 2: Reservar Archivo (SIEMPRE)**
+1. Agregar el archivo a TU `files_being_edited` en `.agent-lock.json`
+2. Actualizar `last_update` con timestamp actual (formato ISO: `YYYY-MM-DDTHH:MM:SSZ`)
+3. Guardar el archivo INMEDIATAMENTE
+4. Si otro agent está editando el mismo archivo, DETENER y elegir otro archivo
+
+**PASO 3: Editar Archivo**
+1. Realizar los cambios normalmente
+2. Verificar que funciona (lint, tests si aplica)
+
+**PASO 4: Liberar Lock (SIEMPRE)**
+1. Remover el archivo de TU `files_being_edited`
+2. Agregar a `tasks_completed` si la tarea está completa
+3. Actualizar `last_update` con timestamp actual
+4. Guardar el archivo INMEDIATAMENTE
+
+### División de Trabajo Recomendada
+
+**Cuando trabajan múltiples agents, dividir por:**
+- **Módulos/Archivos:** Agent 1 edita routers, Agent 2 edita services
+- **Tareas independientes:** Agent 1 hace refactoring, Agent 2 resuelve bugs
+- **Áreas funcionales:** Agent 1 frontend, Agent 2 backend
+
+**NUNCA trabajar simultáneamente en:**
+- El mismo archivo
+- Archivos que dependen directamente (ej: router y su dependency)
+- Mismos modelos/base de datos (sin coordinación explícita)
+
+### Comunicación entre Agents
+
+**❌ NO es posible comunicarse directamente entre agents** (cada agent ejecuta en su propio contexto aislado).
+
+**✅ SOLUCIÓN: Sistema de Locks (`.agent-lock.json`)**
+- Estado compartido actualizado en tiempo real
+- Todos los agents leen/escriben el mismo archivo
+- Previene conflictos automáticamente
+
+**Formato del Lock:**
+```json
+{
+  "agents": {
+    "agent-1": {
+      "status": "active",
+      "current_task": "Descripción de tarea",
+      "files_being_edited": ["ruta/archivo1.py", "ruta/archivo2.ts"],
+      "tasks_completed": ["task-id-1", "task-id-2"],
+      "tasks_in_progress": ["task-id-3"]
+    }
+  },
+  "last_update": "2025-01-27T12:00:00Z"
+}
+```
+
+### Reglas de Coordinación
+
+1. **SIEMPRE leer `.agent-lock.json` antes de editar**
+2. **SIEMPRE actualizar `.agent-lock.json` al reservar/liberar**
+3. **NO editar archivos en `files_being_edited` de otro agent**
+4. **Actualizar `last_update` en cada cambio del lock**
+5. **Mantener `tasks_in_progress` y `tasks_completed` actualizados**
+
+### Ejemplo de Uso
+
+**Agent 1 quiere editar `backend/app/routers/workouts.py`:**
+
+```json
+// ANTES: Leer .agent-lock.json
+{
+  "agents": {
+    "agent-2": {
+      "files_being_edited": ["backend/app/services/coach_service.py"]
+    }
+  }
+}
+
+// ✅ workouts.py NO está en lista de agent-2 → PUEDE EDITAR
+
+// DURANTE: Reservar el archivo
+{
+  "agents": {
+    "agent-1": {
+      "files_being_edited": ["backend/app/routers/workouts.py"]
+    },
+    "agent-2": {
+      "files_being_edited": ["backend/app/services/coach_service.py"]
+    }
+  },
+  "last_update": "2025-01-27T12:05:00Z"
+}
+
+// DESPUÉS: Liberar el lock
+{
+  "agents": {
+    "agent-1": {
+      "files_being_edited": [],
+      "tasks_completed": ["code-centralize-auth-workouts"]
+    }
+  },
+  "last_update": "2025-01-27T12:10:00Z"
+}
+```
+
+### Cuando NO Hay Otro Agent Activo
+
+- Si `.agent-lock.json` muestra `agent-2.status: "inactive"` o no existe
+- Puedes trabajar normalmente sin actualizar locks
+- Pero SIEMPRE verificar primero por si acaso
+
+### Manejo de Conflictos
+
+**Si detectas que otro agent está editando el mismo archivo:**
+1. **DETENER** inmediatamente tus cambios
+2. **COMUNICAR** al usuario del conflicto
+3. **ESPERAR** a que el otro agent termine o **ELEGIR** otro archivo/tarea
+4. **COORDINAR** con el usuario para dividir trabajo diferente
+
+### Integración con Planes
+
+**Cuando se ejecuta un plan con múltiples agents:**
+1. **Leer `scripts/agent-coordination.md`** antes de empezar el plan
+2. El plan debe incluir división clara de tareas por agent
+3. Acordar división de trabajo con el usuario si es necesario
+4. Actualizar `.agent-lock.json` con la división acordada
+5. Cada agent debe actualizar `.agent-lock.json` con sus tareas asignadas conforme avanza
+6. Coordinar por módulos/archivos, no por features completas
+7. El sistema funciona para cualquier plan, no solo el actual
+
+**Ejemplo de División para un Plan:**
+- Agent 1: Routers principales (workouts, events, coach, training_plans)
+- Agent 2: Routers secundarios (health, profile, onboarding, etc.)
+- O dividir por tareas: Agent 1 hace refactoring, Agent 2 resuelve bugs

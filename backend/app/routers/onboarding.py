@@ -3,35 +3,14 @@ Onboarding Router
 Endpoints for initial setup and personalization
 """
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from .. import models, schemas, crud
 from ..database import get_db
-from ..security import verify_token
-from ..core.config import settings
+from ..dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/onboarding", tags=["onboarding"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 @router.get("/status", response_model=schemas.UserProfileOut)

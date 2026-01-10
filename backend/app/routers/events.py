@@ -3,32 +3,17 @@ events.py - Endpoints for running events and races
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
-from app import models, security, schemas
+from app import models, schemas
+from app import security
 from app.database import get_db
 from app.services.events_service import EventsService
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/events", tags=["Events"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db),
-):
-    """Get current user from JWT token."""
-    try:
-        user = security.verify_token(credentials.credentials, db)
-        return user
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
 
 
 @router.get("/races/search", response_model=Dict[str, Any])
@@ -173,7 +158,7 @@ def create_race(
     db: Session = Depends(get_db),
 ):
     """Create a new race event (admin only)."""
-    # TODO: Add is_admin check
+    security.require_admin(current_user)
     try:
         # Check if external_id already exists
         existing = (
@@ -216,7 +201,7 @@ def list_all_races(
     db: Session = Depends(get_db),
 ):
     """List all races (admin only) - includes past events."""
-    # TODO: Add is_admin check
+    security.require_admin(current_user)
     try:
         query = db.query(models.Event)
 
@@ -242,7 +227,7 @@ def get_race_stats(
     db: Session = Depends(get_db),
 ):
     """Get statistics about races in database (admin only)."""
-    # TODO: Add is_admin check
+    security.require_admin(current_user)
     try:
         from datetime import date
 
@@ -295,4 +280,79 @@ def get_race_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting stats: {str(e)}",
+        )
+
+
+@router.put("/admin/races/{race_id}", response_model=schemas.EventOut)
+def update_race(
+    race_id: int,
+    event_update: schemas.EventUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update an existing race event (admin only)."""
+    security.require_admin(current_user)
+    try:
+        # Find the event
+        event = db.query(models.Event).filter(models.Event.id == race_id).first()
+        
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Race with id {race_id} not found"
+            )
+        
+        # Update only provided fields
+        update_data = event_update.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(event, field, value)
+        
+        # Update timestamp
+        event.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(event)
+        
+        return event
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error updating race: {str(e)}",
+        )
+
+
+@router.delete("/admin/races/{race_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_race(
+    race_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete a race event (admin only)."""
+    security.require_admin(current_user)
+    try:
+        # Find the event
+        event = db.query(models.Event).filter(models.Event.id == race_id).first()
+        
+        if not event:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Race with id {race_id} not found"
+            )
+        
+        db.delete(event)
+        db.commit()
+        
+        return None
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error deleting race: {str(e)}",
         )

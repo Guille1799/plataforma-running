@@ -3,43 +3,22 @@ File Upload Router
 Handles manual workout file uploads (FIT, GPX, TCX)
 """
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 import tempfile
 import os
 
 from app.database import get_db
-from app import models, crud
-from app.security import verify_token
-from app.core.config import settings
+from app import models
 from app.services.file_upload_service import file_upload_service
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/upload", tags=["File Upload"])
-security_scheme = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Extract current user from JWT token."""
-    token = credentials.credentials
-    payload = verify_token(token, settings.secret_key, settings.algorithm)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user_id = int(payload.get("sub"))
-    user = crud.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    
-    return user
 
 
 @router.post("/workout")
 async def upload_workout_file(
     file: UploadFile = File(...),
-    user_id: int = Depends(get_current_user),
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -65,7 +44,7 @@ async def upload_workout_file(
         
         # Parse and create workout
         workout = file_upload_service.create_workout_from_file(
-            db, user_id, temp_path, file.filename
+            db, current_user.id, temp_path, file.filename
         )
         
         return {

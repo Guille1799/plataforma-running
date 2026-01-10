@@ -2,9 +2,8 @@
 coach.py - AI Coach endpoints for workout analysis and training plans
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session, joinedload
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
@@ -12,11 +11,12 @@ from app import models, security, schemas
 from app.database import get_db
 from app.core.config import settings
 from app.services.coach_service import get_coach_service
+from app.utils.rate_limiter import limiter
+from app.dependencies.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/coach", tags=["AI Coach"])
-security_scheme = HTTPBearer()
 
 # Lazy-loaded coach service
 coach_service = None
@@ -27,32 +27,6 @@ def _get_coach_service():
     if coach_service is None:
         coach_service = get_coach_service()
     return coach_service
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: Session = Depends(get_db)
-) -> models.User:
-    """Get current authenticated user."""
-    token = credentials.credentials
-    payload = security.verify_token(token, settings.secret_key, settings.algorithm)
-    
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials"
-        )
-    
-    user_id = int(payload.get('sub'))
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    return user
 
 
 # ============================================================================
@@ -79,11 +53,11 @@ def analyze_workout(
     Returns:
         Dict with AI analysis, metrics, and recommendations
     """
-    # Get workout
+    # Get workout with eager loading to prevent N+1 queries
     workout = db.query(models.Workout).filter(
         models.Workout.id == workout_id,
         models.Workout.user_id == current_user.id
-    ).first()
+    ).options(joinedload(models.Workout.user)).first()
     
     if not workout:
         raise HTTPException(
@@ -92,9 +66,15 @@ def analyze_workout(
         )
     
     # Get recent workouts for context (last 10)
-    recent_workouts = db.query(models.Workout).filter(
-        models.Workout.user_id == current_user.id
-    ).order_by(models.Workout.start_time.desc()).limit(10).all()
+    # Use eager loading to prevent potential N+1 queries if workout.user is accessed
+    recent_workouts = (
+        db.query(models.Workout)
+        .filter(models.Workout.user_id == current_user.id)
+        .options(joinedload(models.Workout.user))  # Eager load user relationship
+        .order_by(models.Workout.start_time.desc())
+        .limit(10)
+        .all()
+    )
     
     # Ensure user has max_heart_rate for zone calculation
     if not current_user.max_heart_rate and workout.max_heart_rate:
@@ -182,10 +162,10 @@ def generate_training_plan(
         Dict with complete training plan organized by weeks and days
     """
     try:
-        # Get recent workouts for context
+        # Get recent workouts for context with eager loading to prevent N+1 queries
         recent_workouts = db.query(models.Workout).filter(
             models.Workout.user_id == current_user.id
-        ).order_by(models.Workout.start_time.desc()).limit(20).all()
+        ).options(joinedload(models.Workout.user)).order_by(models.Workout.start_time.desc()).limit(20).all()
         
         plan = _get_coach_service().generate_personalized_training_plan(
             user=current_user,
@@ -295,11 +275,11 @@ def analyze_running_form(
     Returns:
         Dict with form metrics, issues, and recommendations
     """
-    # Get workout
+    # Get workout with eager loading to prevent N+1 queries
     workout = db.query(models.Workout).filter(
         models.Workout.id == workout_id,
         models.Workout.user_id == current_user.id
-    ).first()
+    ).options(joinedload(models.Workout.user)).first()
     
     if not workout:
         raise HTTPException(
@@ -327,7 +307,9 @@ def analyze_running_form(
 # ============================================================================
 
 @router.post("/chat", response_model=schemas.ChatResponse)
+@limiter.limit("10/hour")
 def chat_with_coach(
+    request: Request,
     message: schemas.ChatMessageCreate,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -358,9 +340,15 @@ def chat_with_coach(
     conversation_history = list(reversed(conversation_history))
     
     # Get recent workouts for context
-    recent_workouts = db.query(models.Workout).filter(
-        models.Workout.user_id == current_user.id
-    ).order_by(models.Workout.start_time.desc()).limit(10).all()
+    # Use eager loading to prevent potential N+1 queries if workout.user is accessed
+    recent_workouts = (
+        db.query(models.Workout)
+        .filter(models.Workout.user_id == current_user.id)
+        .options(joinedload(models.Workout.user))  # Eager load user relationship
+        .order_by(models.Workout.start_time.desc())
+        .limit(10)
+        .all()
+    )
     
     try:
         # Get AI response
@@ -490,11 +478,11 @@ def analyze_workout_deep(
     
     Returns comprehensive structured analysis.
     """
-    # Get the workout
+    # Get the workout with eager loading to prevent N+1 queries
     workout = db.query(models.Workout).filter(
         models.Workout.id == workout_id,
         models.Workout.user_id == current_user.id
-    ).first()
+    ).options(joinedload(models.Workout.user)).first()
     
     if not workout:
         raise HTTPException(
