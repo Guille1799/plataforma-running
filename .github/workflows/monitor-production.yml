@@ -248,7 +248,8 @@ jobs:
           EOF
       
       - name: 📝 Commit status file
-        if: always()
+        # SOLO hacer commit en scheduled runs (cron), NO en push manual para evitar ciclo infinito
+        if: always() && github.event_name == 'schedule'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -256,7 +257,7 @@ jobs:
           
           # Solo commit si hay cambios
           if ! git diff --staged --quiet; then
-            git commit -m "ci: Update production status [skip ci]" || echo "Commit failed"
+            git commit -m "ci: Update production status [skip vercel] [skip ci]" || echo "Commit failed"
             git push || echo "Push failed (may be permission issue)"
           else
             echo "No hay cambios en el archivo de estado"
