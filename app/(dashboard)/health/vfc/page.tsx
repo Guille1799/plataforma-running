@@ -39,7 +39,7 @@ export default function VFCDetailPage() {
         if (vfc >= 60) return { text: 'Excelente', color: 'text-green-500', variant: 'default' as const, description: 'Muy buena recuperación' }
         if (vfc >= 40) return { text: 'Bueno', color: 'text-blue-500', variant: 'default' as const, description: 'Recuperación adecuada' }
         if (vfc >= 20) return { text: 'Regular', color: 'text-yellow-500', variant: 'secondary' as const, description: 'Necesitas más descanso' }
-        return { text: 'Bajo', color: 'text-red-500', variant: 'destructive' as const, description: 'Prioriza la recuperación' }
+        return { text: 'Bajo', color: 'text-red-500', variant: 'outline' as const, description: 'Prioriza la recuperación' }
     }
 
     const status = latest ? getVFCStatus(latest.vfc) : null
