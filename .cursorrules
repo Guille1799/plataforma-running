@@ -1,0 +1,345 @@
+# 🎯 RunCoach AI - Instrucciones de Desarrollo
+
+## Filosofía de Trabajo
+
+**Objetivo:** Excelencia y robustez máxima. Proyecto productivo perfecto.
+
+### Principios Fundamentales
+
+1. **Código de Producción**
+   - Todo código debe estar listo para producción
+   - No dejar TODOs sin resolver
+   - Manejo de errores exhaustivo
+   - Validación de datos en todas las capas
+   - Logging apropiado para debugging
+
+2. **Documentación**
+   - Documentación siempre actualizada con el código
+   - Versiones exactas en toda la documentación
+   - Ejemplos de código funcionales y probados
+   - Comentarios claros en código complejo
+
+3. **Arquitectura**
+   - Separación clara de responsabilidades
+   - Código reutilizable y modular
+   - Type safety estricto (TypeScript)
+   - Validación de esquemas (Pydantic/Zod)
+
+4. **Testing**
+   - Tests para funcionalidades críticas
+   - Validación manual antes de marcar como completo
+   - Edge cases considerados
+
+5. **Seguridad**
+   - Nunca exponer secrets en código
+   - Validación de inputs en backend
+   - Sanitización de datos de usuario
+   - Autenticación JWT correctamente implementada
+
+## 🎓 Metodología de Explicación
+
+**CRÍTICO:** Siempre explicar qué se ha hecho y por qué, con DOS niveles:
+
+### 1. Explicación Técnica
+- Para desarrolladores con experiencia
+- Detalles de implementación
+- Decisiones técnicas y alternativas consideradas
+- Impacto en arquitectura y rendimiento
+
+### 2. Explicación para Dummies
+- Lenguaje simple y claro
+- Analogías cuando sea útil
+- Sin jerga técnica innecesaria
+- Enfocado en "qué hace" y "por qué importa"
+
+### 3. Confirmación antes de Continuar
+- **NO pasar al siguiente paso hasta recibir OK explícito**
+- Esperar confirmación de que se entendió
+- Aclarar dudas antes de continuar
+- Verificar que el usuario está listo para el siguiente cambio
+
+### Ejemplo de Explicación Dual:
+
+**Técnico:**
+"Implementé un interceptor de Axios que maneja refresh tokens automáticamente. Cuando detecta un 401, intercepta la respuesta, llama al endpoint `/auth/refresh` con el refresh token almacenado, actualiza el access token en memoria y localStorage, y reintenta la petición original. Esto mejora la UX al evitar que el usuario tenga que hacer login manualmente cuando expira el token."
+
+**Para Dummies:**
+"Cuando tu sesión expira (como cuando te desconectas de Netflix), en lugar de pedirte que vuelvas a iniciar sesión manualmente, el sistema automáticamente renueva tu sesión en segundo plano y continúa con lo que estabas haciendo. Es como tener un asistente que renueva tu pase sin que te des cuenta."
+
+## 🔄 Flujo de Trabajo OBLIGATORIO
+
+**⚠️ CRÍTICO: Este flujo debe seguirse estrictamente. Si el usuario se sale de este flujo, emitir un WARNING explícito.**
+
+### Modo ASK (Preguntas y Consultas)
+**USO EXCLUSIVO:**
+- ✅ Preguntas sobre el código existente
+- ✅ Explicaciones de cómo funciona algo
+- ✅ Análisis y revisión de código (sin cambios)
+- ✅ Consultas de documentación
+- ✅ Sugerencias y recomendaciones
+- ✅ Entender el contexto antes de planificar
+
+**NO USAR para:**
+- ❌ Hacer cambios en código
+- ❌ Crear archivos nuevos
+- ❌ Ejecutar comandos
+- ❌ Planificar features grandes
+
+**EJEMPLOS CORRECTOS:**
+```
+✅ "¿Cómo funciona la autenticación JWT en este proyecto?"
+✅ "Revisa este componente y dime si hay problemas"
+✅ "Explícame el flujo de sincronización de Garmin"
+✅ "¿Qué mejoras necesita esta función?"
+✅ "Analiza este código y sugiere optimizaciones"
+```
+
+### Modo PLAN (Planificación)
+**USO EXCLUSIVO:**
+- ✅ Crear planes detallados para features grandes
+- ✅ Planificar refactorizaciones complejas
+- ✅ Diseñar arquitectura de nuevas funcionalidades
+- ✅ Dividir tareas en pasos ejecutables
+- ✅ Planificar migraciones o cambios estructurales
+
+**NO USAR para:**
+- ❌ Hacer preguntas simples
+- ❌ Ejecutar código o cambios
+- ❌ Implementar directamente
+
+**EJEMPLOS CORRECTOS:**
+```
+✅ "Planifica la implementación de notificaciones push"
+✅ "Crea un plan para refactorizar el sistema de autenticación"
+✅ "Planifica la optimización de queries en la base de datos"
+✅ "Diseña un plan para migrar a TypeScript estricto"
+```
+
+**PROCESO:**
+1. Analizar el código actual y contexto
+2. Crear plan paso a paso detallado
+3. Explicar cada paso (técnico + simple)
+4. Esperar aprobación del plan
+5. **NO ejecutar el plan** - eso es trabajo de AGENT
+
+### Modo AGENT (Ejecución de Código y Cambios)
+**USO EXCLUSIVO:**
+- ✅ Implementar código según un plan aprobado
+- ✅ Crear/editar/eliminar archivos
+- ✅ Refactorizar código existente
+- ✅ Ejecutar comandos (git, npm, pip, etc.)
+- ✅ Aplicar fixes y correcciones
+- ✅ Implementar features completas
+
+**NO USAR para:**
+- ❌ Hacer preguntas
+- ❌ Solo planificar sin implementar
+- ❌ Consultas sin cambios
+
+**EJEMPLOS CORRECTOS:**
+```
+✅ "Implementa el endpoint POST /api/v1/workouts según el plan aprobado"
+✅ "Crea el componente WorkoutCard con las especificaciones dadas"
+✅ "Refactoriza el servicio de autenticación según el plan paso 2"
+✅ "Aplica el fix para el bug de sincronización de Garmin"
+✅ "Crea los tests unitarios para el módulo de entrenamientos"
+```
+
+**REQUISITO:**
+- AGENT solo debe ejecutar cuando hay un plan aprobado o instrucciones claras
+- Si no hay plan, sugerir usar PLAN primero
+
+### ⚠️ SISTEMA DE WARNINGS
+
+**Si el usuario intenta usar un modo incorrecto, emitir este warning:**
+
+```
+⚠️ WARNING: Flujo de trabajo incorrecto detectado
+
+Estás en modo [MODO_ACTUAL] pero estás intentando [ACCIÓN_INCORRECTA].
+
+Flujo correcto:
+1. ASK → Para preguntas y consultas
+2. PLAN → Para planificar features/cambios grandes
+3. AGENT → Para ejecutar código y cambios
+
+Acción sugerida:
+[EXPLICAR QUÉ MODO USAR Y POR QUÉ]
+```
+
+**EJEMPLOS DE WARNINGS:**
+
+Si en ASK piden crear código:
+```
+⚠️ WARNING: Estás en modo ASK (solo consultas) pero intentas crear código.
+
+Para crear código, debes:
+1. Usar ASK primero: "¿Cómo debería implementarse X?" o "Planifica Y"
+2. Luego cambiar a PLAN: "Crea un plan detallado para implementar X"
+3. Finalmente usar AGENT: "Implementa el plan paso 1"
+
+¿Quieres que cambie a modo PLAN primero?
+```
+
+Si en PLAN intentan ejecutar directamente:
+```
+⚠️ WARNING: Estás en modo PLAN (solo planificación) pero intentas ejecutar código.
+
+El flujo correcto es:
+1. PLAN → Crear y aprobar el plan (✓ Ya hecho)
+2. AGENT → Ejecutar el plan implementando el código
+
+¿Quieres cambiar a modo AGENT para ejecutar el plan?
+```
+
+Si en AGENT piden solo preguntas:
+```
+⚠️ WARNING: Estás en modo AGENT (para ejecutar código) pero solo haces una pregunta.
+
+Para preguntas y consultas, usa modo ASK.
+
+Para mantener el contexto, puedo:
+- Responder aquí, pero para futuras consultas usa ASK
+- O cambiar a modo ASK para esta pregunta
+
+¿Cómo prefieres proceder?
+```
+
+## Stack Tecnológico (Versiones Exactas)
+
+### Frontend
+- **Next.js:** 16.0.3
+- **React:** 19.2.0
+- **TypeScript:** 5.x
+- **Tailwind CSS:** 4.x
+- **React Query:** 5.90.8
+- **Zustand:** 5.0.8
+- **Zod:** 4.1.12
+- **Recharts:** 3.4.1
+
+### Backend
+- **Python:** 3.11+
+- **FastAPI:** 0.121.1
+- **SQLAlchemy:** 2.0.44
+- **Pydantic:** 2.12.4
+- **Celery:** 5.4.0
+- **PostgreSQL:** 15
+- **Redis:** 7
+
+## Estructura del Proyecto
+
+```
+plataforma-running/
+├── app/                    # Frontend Next.js (App Router)
+│   ├── (auth)/            # Rutas de autenticación
+│   ├── (dashboard)/       # Rutas protegidas del dashboard
+│   └── components/        # Componentes React
+├── backend/               # API FastAPI
+│   ├── app/
+│   │   ├── routers/       # Endpoints API
+│   │   ├── services/      # Lógica de negocio
+│   │   ├── models.py      # Modelos SQLAlchemy
+│   │   └── schemas.py     # Validación Pydantic
+│   └── tests/             # Tests del backend
+├── components/            # Componentes compartidos
+├── lib/                   # Utilidades y helpers
+├── hooks/                 # React hooks personalizados
+├── docs/                  # Documentación actualizada
+│   ├── ARCHITECTURE.md
+│   ├── DEVELOPMENT.md
+│   ├── API.md
+│   └── DEPLOYMENT.md
+└── GUIAS_Y_EXPLICACIONES/ # Guías principales
+```
+
+## Convenciones de Código
+
+### TypeScript/React
+- Usar `interface` para tipos de objetos
+- Componentes funcionales con TypeScript
+- Props tipadas explícitamente
+- Manejo de errores con try/catch y estados de error
+- Loading states siempre presentes
+
+### Python/FastAPI
+- Type hints en todas las funciones
+- Docstrings en funciones públicas
+- Validación con Pydantic schemas
+- Manejo de excepciones específicas
+- Logging estructurado
+
+### Nombres
+- Variables: camelCase (TS) / snake_case (Python)
+- Componentes: PascalCase
+- Archivos: kebab-case para componentes, camelCase para utilidades
+- Constantes: UPPER_SNAKE_CASE
+
+## Flujo de Trabajo Estándar
+
+### Para Features Nuevas:
+```
+1. ASK → "¿Cómo funciona X actualmente?" (entender contexto)
+2. ASK → "¿Qué necesitamos para implementar Y?" (requisitos)
+3. PLAN → "Crea un plan detallado para implementar Y"
+4. Revisar y aprobar plan
+5. AGENT → "Implementa el plan paso 1"
+6. Revisar código generado
+7. AGENT → "Continúa con el paso 2" (repetir hasta completar)
+8. ASK → "Revisa el código final y sugiere mejoras"
+```
+
+### Para Bugs:
+```
+1. ASK → "Investiga este error: [descripción]"
+2. ASK → "¿Cuál es la causa raíz y cómo se soluciona?"
+3. PLAN → "Crea un plan para arreglar el bug"
+4. AGENT → "Implementa la solución según el plan"
+5. ASK → "Verifica que la solución es correcta"
+```
+
+### Para Refactorizaciones:
+```
+1. ASK → "Analiza este código y sugiere mejoras"
+2. PLAN → "Crea un plan de refactorización"
+3. AGENT → "Ejecuta el plan de refactorización"
+4. ASK → "Revisa el código refactorizado"
+```
+
+## Documentación
+
+- **Siempre actualizar** cuando cambies código
+- **Versiones exactas** en toda la documentación
+- **Ejemplos funcionales** que se puedan copiar y pegar
+- **Diagramas ASCII** para arquitectura cuando sea útil
+
+## Errores Comunes a Evitar
+
+1. ❌ Dejar versiones incorrectas en documentación
+2. ❌ Código sin manejo de errores
+3. ❌ TODOs sin resolver
+4. ❌ Validación solo en frontend
+5. ❌ Secrets hardcodeados
+6. ❌ Código comentado sin explicación
+7. ❌ Funciones sin type hints/types
+8. ❌ Continuar sin confirmación del usuario
+9. ❌ **Usar modo incorrecto para la tarea**
+10. ❌ **Intentar ejecutar código en modo ASK o PLAN**
+
+## Checklist de Calidad
+
+Antes de marcar algo como completo:
+
+- [ ] Código funciona correctamente
+- [ ] Manejo de errores implementado
+- [ ] Validación de datos presente
+- [ ] Type safety completo
+- [ ] Documentación actualizada
+- [ ] Versiones correctas en docs
+- [ ] Sin TODOs pendientes
+- [ ] Edge cases considerados
+- [ ] Logging apropiado
+- [ ] Código limpio y legible
+- [ ] Explicación técnica proporcionada
+- [ ] Explicación simple proporcionada
+- [ ] Confirmación del usuario recibida
+- [ ] **Flujo de trabajo correcto seguido (ASK → PLAN → AGENT)**
