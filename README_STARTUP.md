@@ -2,9 +2,13 @@
 
 Hemos simplificado el proceso de arranque para usar **Docker** (backend) y **Next.js** (frontend) de forma robusta.
 
-## 1. Iniciar la Plataforma (`start-dev.bat`)
+## 1. Iniciar la Plataforma (`start-dev.ps1`)
 
-Simplemente haz doble clic en el archivo `start-dev.bat` en la carpeta del proyecto.
+Ejecuta el script PowerShell `start-dev.ps1` en la carpeta del proyecto:
+
+```powershell
+.\start-dev.ps1
+```
 
 Este script:
 1. Levanta el Backend, Base de Datos y Redis usando Docker.
@@ -15,11 +19,15 @@ Este script:
 - **Frontend:** http://localhost:3000
 - **Backend API:** http://localhost:8000/docs
 
-## 2. Detener la Plataforma (`stop-dev.bat`)
+## 2. Detener la Plataforma (`stop-dev.ps1`)
 
 Para apagar todo correctamente:
-1. Cierra la ventana negra del Frontend.
-2. Haz doble clic en `stop-dev.bat`.
+1. Cierra la ventana del Frontend.
+2. Ejecuta el script PowerShell:
+
+```powershell
+.\stop-dev.ps1
+```
 
 Esto detendrá los contenedores de Docker para liberar memoria.
 

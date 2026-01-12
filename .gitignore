@@ -42,6 +42,17 @@ token.txt
 migrate_*.py
 setup_*.ps1
 
+# --- Logs del servidor ---
+*.log
+server_error.log
+server_output.log
+
+# --- Reportes de monitoreo temporales ---
+monitoring-report-*.txt
+
+# --- Bases de datos en raíz (mantener solo en backend/) ---
+/runcoach.db
+
 # --- Documentación temporal ---
 *_SUMMARY.md
 *_STATUS.md
