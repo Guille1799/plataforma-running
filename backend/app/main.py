@@ -80,15 +80,11 @@ if settings.environment == "production" and (not settings.secret_key or not sett
 #   - ALWAYS use Alembic migrations: `cd backend && alembic upgrade head`
 #   - Never use create_all() in production
 #   - Run migrations BEFORE starting the server
-if settings.environment == "development":
-    # Only auto-create tables in development for convenience
-    # For production-like testing, comment this out and use: `alembic upgrade head`
-    logger.info("Development mode: Auto-creating database tables if they don't exist")
-    logger.info("Note: For production-like setup, use 'alembic upgrade head' instead")
-    models.Base.metadata.create_all(bind=engine)
-else:
-    logger.info("Production mode: Using Alembic migrations for database schema management")
-    logger.info("Ensure migrations are applied: Run 'cd backend && alembic upgrade head'")
+# Database schema is managed exclusively through Alembic migrations
+# Migrations are automatically run in Docker via docker-compose.dev.yml
+# For local development: Run 'cd backend && alembic upgrade head' manually
+logger.info("Database schema managed via Alembic migrations")
+logger.info("Migrations should be applied before starting the server")
 
 
 # Middleware to log request bodies for debugging

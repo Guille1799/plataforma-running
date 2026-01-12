@@ -43,11 +43,43 @@ docker-compose -f docker-compose.dev.yml stop
 Get-Process node | Stop-Process -Force
 ```
 
+## Migraciones de Base de Datos
+
+Las migraciones de base de datos se ejecutan **automáticamente** al iniciar el backend en Docker.
+
+**En Docker (automático):**
+- Las migraciones se ejecutan antes de iniciar el servidor
+- No necesitas hacer nada manualmente
+
+**Desarrollo local (sin Docker):**
+```powershell
+cd backend
+python -m alembic upgrade head
+```
+
+**Crear nueva migración:**
+```powershell
+cd backend
+python -m alembic revision --autogenerate -m "Descripción del cambio"
+python -m alembic upgrade head
+```
+
+**Ver estado de migraciones:**
+```powershell
+cd backend
+python -m alembic current    # Estado actual
+python -m alembic history   # Historial completo
+```
+
 ## Troubleshooting
 
 **Backend no inicia:**
 - Verifica Docker Desktop está corriendo
 - Reconstruye: `docker-compose -f docker-compose.dev.yml up --build`
+
+**Error de migraciones:**
+- Si la base de datos está desincronizada: `docker exec runcoach_backend python -m alembic stamp head`
+- Luego reinicia: `docker-compose -f docker-compose.dev.yml restart backend`
 
 **Frontend con lock:**
 ```powershell
