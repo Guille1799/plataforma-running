@@ -3,12 +3,17 @@ Training Plan Generator
 AI-powered personalized training plan creation using Groq/Llama
 """
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from groq import Groq
+import json
+import logging
+import re
 
 from .. import models
 from ..core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class TrainingPlanService:
@@ -53,48 +58,88 @@ class TrainingPlanService:
             workouts_per_week = 0
         
         # Build context for AI
-        context = self._build_plan_context(user, goal, recent_workouts, weeks)
+        context = self._build_plan_context(db, user, goal, recent_workouts, weeks)
         
-        # Generate plan with AI
+        # Generate plan with AI - Improved prompt with better structure
         prompt = f"""Genera un plan de entrenamiento personalizado de {weeks} semanas.
 
 {context}
 
-INSTRUCCIONES:
-1. Crea un plan progresivo semana a semana
-2. Incluye variedad: rodajes suaves, tempo, series, largo
-3. Balancea volumen e intensidad
-4. Incluye descansos estratégicos
-5. Prepara específicamente para el objetivo
+INSTRUCCIONES DETALLADAS:
+1. Crea un plan progresivo semana a semana con periodización adecuada
+2. Incluye variedad: rodajes suaves (easy_run), tempo (tempo_run), intervalos (interval_run), largos (long_run), recuperación (recovery), cross-training
+3. Balancea volumen e intensidad - aumenta gradualmente
+4. Incluye descansos estratégicos (al menos 1-2 días de recuperación por semana)
+5. Prepara específicamente para el objetivo establecido
+6. Ajusta el volumen inicial basándote en el volumen semanal actual del atleta
+7. Para cada workout, proporciona detalles completos: distancia, ritmo objetivo, zonas HR si aplica, duración estimada, notas
 
-FORMATO (JSON):
+ESTRUCTURA JSON REQUERIDA:
 {{
-  "plan_name": "Nombre del plan",
-  "goal_summary": "Resumen del objetivo",
+  "plan_name": "Nombre descriptivo del plan",
+  "goal_summary": "Resumen del objetivo en 1-2 oraciones",
   "weeks": [
     {{
       "week": 1,
-      "focus": "Base aeróbica",
-      "total_km": 25,
+      "focus": "Descripción del enfoque de la semana",
+      "total_km": 25.0,
+      "intensity_score": 45.0,
       "workouts": [
         {{
           "day": 1,
           "type": "easy_run",
           "name": "Rodaje suave",
-          "distance_km": 6,
-          "pace_target": "5:30-6:00 min/km",
-          "notes": "Mantén conversacional"
+          "distance_km": 6.0,
+          "duration_minutes": 35,
+          "pace_target_min_per_km": 5.45,
+          "pace_range": {{"min": 5.30, "max": 6.00}},
+          "heart_rate_zones": [2],
+          "heart_rate_percentage": {{"min": 65, "max": 75}},
+          "rpe_target": 4,
+          "intervals": null,
+          "notes": "Mantén ritmo conversacional. Zona 2."
         }},
-        ...
+        {{
+          "day": 3,
+          "type": "tempo_run",
+          "name": "Tempo 5K",
+          "distance_km": 8.0,
+          "duration_minutes": 35,
+          "pace_target_min_per_km": 4.30,
+          "pace_range": {{"min": 4.15, "max": 4.45}},
+          "heart_rate_zones": [3, 4],
+          "heart_rate_percentage": {{"min": 85, "max": 92}},
+          "rpe_target": 7,
+          "intervals": null,
+          "notes": "Ritmo sostenido pero controlado"
+        }}
       ]
-    }},
-    ...
+    }}
   ],
-  "nutrition_tips": ["tip1", "tip2"],
-  "recovery_tips": ["tip1", "tip2"]
+  "metrics": {{
+    "total_km": 300.0,
+    "total_workouts": 42,
+    "longest_run_km": 32.0,
+    "peak_week_km": 65.0
+  }},
+  "nutrition_tips": [
+    "Hidrátate bien antes y después de entrenamientos largos",
+    "Come carbohidratos 2-3 horas antes de entrenamientos intensos"
+  ],
+  "recovery_tips": [
+    "Prioriza el sueño - objetivo 7-9 horas",
+    "Estira después de cada entrenamiento",
+    "Toma días de recuperación activa si tienes molestias"
+  ]
 }}
 
-Genera el plan completo en JSON:"""
+IMPORTANTE:
+- Genera SOLO JSON válido sin texto adicional
+- El campo "day" debe ser un número de 1-7 (Lunes=1, Domingo=7)
+- Todos los valores numéricos deben ser números (no strings)
+- Incluye TODAS las {weeks} semanas completas
+- Cada semana debe tener entre 4-6 workouts (incluyendo descansos)
+- Calcula métricas totales del plan"""
 
         try:
             completion = self.client.chat.completions.create(
@@ -113,27 +158,10 @@ Genera el plan completo en JSON:"""
                 max_tokens=4000
             )
             
-            import json
             plan_text = completion.choices[0].message.content
             
-            # Extract JSON (might be wrapped in markdown)
-            if "```json" in plan_text:
-                plan_text = plan_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in plan_text:
-                plan_text = plan_text.split("```")[1].split("```")[0].strip()
-            
-            # Try to parse JSON, with fallback
-            try:
-                plan_data = json.loads(plan_text)
-            except json.JSONDecodeError as e:
-                # If JSON parsing fails, try to fix common issues
-                # Remove trailing commas
-                plan_text = plan_text.replace(',]', ']').replace(',}', '}')
-                try:
-                    plan_data = json.loads(plan_text)
-                except json.JSONDecodeError:
-                    # Final fallback: create a basic plan structure
-                    plan_data = self._create_fallback_plan(goal, weeks)
+            # Extract JSON with robust parsing (multiple attempts)
+            plan_data = self._parse_ai_response(plan_text, goal, weeks)
             
             # Add metadata with unique plan_id using microseconds
             from datetime import datetime as dt
@@ -153,26 +181,73 @@ Genera el plan completo en JSON:"""
     
     def _build_plan_context(
         self,
+        db: Session,
         user: models.User,
         goal: Dict[str, Any],
         recent_workouts: List[models.Workout],
         weeks: int
     ) -> str:
-        """Build context string for AI prompt."""
+        """Build comprehensive context string for AI prompt including health metrics."""
         context = f"""PERFIL DEL ATLETA:
 - Nivel: {user.running_level or 'intermedio'}
 - FC máxima: {user.max_heart_rate or 'No disponible'} bpm
+- FC en reposo: {user.resting_heart_rate or 'No disponible'} bpm
+- VO2 Max: {user.vo2_max or 'No disponible'}
+- Altura: {user.height_cm or 'No disponible'} cm
+- Peso: {user.weight_kg or 'No disponible'} kg
 - Entrenamientos recientes: {len(recent_workouts)} en últimas 4 semanas
 """
 
+        # Workout analysis
         if recent_workouts:
             total_km = sum(w.distance_meters for w in recent_workouts) / 1000
             avg_paces = [w.avg_pace for w in recent_workouts if w.avg_pace]
             avg_pace = sum(avg_paces) / len(avg_paces) if avg_paces else None
+            workouts_per_week = len(recent_workouts) / 4 if len(recent_workouts) >= 4 else len(recent_workouts)
             
-            context += f"""- Volumen semanal promedio: {total_km / 4:.1f} km
+            context += f"""- Volumen semanal promedio: {total_km / max(4, len(recent_workouts) / workouts_per_week) if workouts_per_week > 0 else total_km:.1f} km
 - Pace promedio: {avg_pace:.2f} min/km
 - Workout más largo: {max(w.distance_meters for w in recent_workouts) / 1000:.1f} km
+- Distancia total últimos 30 días: {total_km:.1f} km
+"""
+
+        # Health metrics context
+        try:
+            recent_health = db.query(models.HealthMetric).filter(
+                models.HealthMetric.user_id == user.id,
+                models.HealthMetric.date >= date.today() - timedelta(days=14)
+            ).order_by(models.HealthMetric.date.desc()).limit(7).all()
+            
+            if recent_health:
+                health_metrics_text = "\nMÉTRICAS DE SALUD (últimas 2 semanas):\n"
+                
+                hrv_values = [h.hrv_ms for h in recent_health if h.hrv_ms]
+                if hrv_values:
+                    avg_hrv = sum(hrv_values) / len(hrv_values)
+                    health_metrics_text += f"- HRV promedio: {avg_hrv:.0f} ms (últimos {len(recent_health)} días)\n"
+                
+                readiness_values = [h.readiness_score for h in recent_health if h.readiness_score]
+                if readiness_values:
+                    avg_readiness = sum(readiness_values) / len(readiness_values)
+                    health_metrics_text += f"- Readiness promedio: {avg_readiness:.0f}/100\n"
+                
+                sleep_values = [h.sleep_duration_minutes for h in recent_health if h.sleep_duration_minutes]
+                if sleep_values:
+                    avg_sleep = sum(sleep_values) / len(sleep_values)
+                    health_metrics_text += f"- Sueño promedio: {avg_sleep/60:.1f} horas/noche\n"
+                
+                if health_metrics_text != "\nMÉTRICAS DE SALUD (últimas 2 semanas):\n":
+                    context += health_metrics_text
+        except Exception as e:
+            logger.warning(f"Error fetching health metrics for context: {e}")
+
+        # Injury considerations
+        if user.injuries:
+            active_injuries = [inj for inj in user.injuries if isinstance(inj, dict) and not inj.get('recovered', True)]
+            if active_injuries:
+                context += f"""
+LESIONES ACTIVAS:
+- Consideraciones: {', '.join([inj.get('type', '') + ': ' + inj.get('description', '')[:50] for inj in active_injuries[:3]])}
 """
 
         context += f"""
@@ -181,87 +256,316 @@ OBJETIVO:
 - Meta: {goal.get('target', 'mejorar rendimiento')}
 - Fecha objetivo: {goal.get('date', 'flexible')}
 - Duración del plan: {weeks} semanas
+- Volumen semanal actual: {goal.get('current_weekly_km', 0)} km/semana
+- Notas: {goal.get('notes', 'Ninguna')}
 
 PREFERENCIAS:
 - Días disponibles: {goal.get('days_per_week', '4-5')} por semana
 - Estilo de coaching: {user.coaching_style or 'balanceado'}
+- Zonas HR: {'Configuradas' if user.hr_zones else 'No configuradas'}
 """
 
         return context
+    
+    def _parse_ai_response(
+        self,
+        response_text: str,
+        goal: Dict[str, Any],
+        weeks: int,
+        max_attempts: int = 5
+    ) -> Dict[str, Any]:
+        """Parse AI response with multiple attempts and JSON fixing.
+        
+        Args:
+            response_text: Raw response from AI
+            goal: Goal dictionary for fallback
+            weeks: Number of weeks for fallback
+            max_attempts: Maximum parsing attempts
+            
+        Returns:
+            Parsed plan data dictionary
+        """
+        # Extract JSON from markdown code blocks
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0].strip()
+        
+        # Remove any leading/trailing whitespace
+        response_text = response_text.strip()
+        
+        # Multiple parsing attempts with different fixes
+        for attempt in range(max_attempts):
+            try:
+                plan_data = json.loads(response_text)
+                # Validate basic structure
+                if self._validate_plan_structure(plan_data, weeks):
+                    return plan_data
+                else:
+                    logger.warning(f"Plan structure validation failed on attempt {attempt + 1}")
+            except json.JSONDecodeError as e:
+                if attempt < max_attempts - 1:
+                    # Try to fix common JSON issues
+                    response_text = self._fix_json_common_issues(response_text)
+                    logger.debug(f"JSON parse error on attempt {attempt + 1}: {e}. Retrying with fixes...")
+                else:
+                    logger.error(f"Failed to parse JSON after {max_attempts} attempts: {e}")
+                    logger.debug(f"Response text (first 500 chars): {response_text[:500]}")
+        
+        # Final fallback: create a basic plan structure
+        logger.warning("Using fallback plan due to parsing failures")
+        return self._create_fallback_plan(goal, weeks)
+    
+    def _fix_json_common_issues(self, json_text: str) -> str:
+        """Fix common JSON issues in AI responses.
+        
+        Args:
+            json_text: JSON string with potential issues
+            
+        Returns:
+            Fixed JSON string
+        """
+        # Remove trailing commas before ] or }
+        json_text = re.sub(r',(\s*[}\]])', r'\1', json_text)
+        
+        # Fix single quotes to double quotes for keys only (be careful)
+        # Only fix key:value pairs, not strings
+        json_text = re.sub(r"'(\w+)':\s*", r'"\1": ', json_text)
+        
+        # Remove comments (// or /* */)
+        json_text = re.sub(r'//.*?$', '', json_text, flags=re.MULTILINE)
+        json_text = re.sub(r'/\*.*?\*/', '', json_text, flags=re.DOTALL)
+        
+        return json_text
+    
+    def _validate_plan_structure(self, plan_data: Dict[str, Any], expected_weeks: int) -> bool:
+        """Validate that plan has correct structure.
+        
+        Args:
+            plan_data: Parsed plan dictionary
+            expected_weeks: Expected number of weeks
+            
+        Returns:
+            True if structure is valid, False otherwise
+        """
+        try:
+            # Check required top-level fields
+            if not isinstance(plan_data, dict):
+                return False
+            
+            if "plan_name" not in plan_data or "weeks" not in plan_data:
+                return False
+            
+            # Check weeks structure
+            weeks = plan_data.get("weeks", [])
+            if not isinstance(weeks, list):
+                return False
+            
+            # Check we have at least expected number of weeks
+            if len(weeks) < expected_weeks:
+                logger.warning(f"Plan has {len(weeks)} weeks but expected {expected_weeks}")
+                return False
+            
+            # Validate first week structure as sample
+            if len(weeks) > 0:
+                first_week = weeks[0]
+                if not isinstance(first_week, dict):
+                    return False
+                if "week" not in first_week or "workouts" not in first_week:
+                    return False
+                if not isinstance(first_week.get("workouts"), list):
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error validating plan structure: {e}")
+            return False
     
     def adapt_plan(
         self,
         db: Session,
         user: models.User,
         plan_data: Dict[str, Any],
-        actual_workouts: List[models.Workout]
+        actual_workouts: List[models.Workout],
+        health_metrics: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Adapt training plan based on actual performance.
+        Adapt training plan based on actual performance and health metrics.
         
         Args:
             db: Database session
             user: User model
             plan_data: Current plan
             actual_workouts: Recent completed workouts
+            health_metrics: Optional health metrics (HRV, readiness, sleep, etc.)
             
         Returns:
             Adapted plan for upcoming weeks
         """
-        # Calculate adherence
+        # Get health metrics if not provided
+        if health_metrics is None:
+            try:
+                recent_health = db.query(models.HealthMetric).filter(
+                    models.HealthMetric.user_id == user.id,
+                    models.HealthMetric.date >= date.today() - timedelta(days=7)
+                ).order_by(models.HealthMetric.date.desc()).limit(7).all()
+                
+                if recent_health:
+                    health_metrics = {
+                        'avg_hrv': sum(h.hrv_ms for h in recent_health if h.hrv_ms) / len([h for h in recent_health if h.hrv_ms]) if any(h.hrv_ms for h in recent_health) else None,
+                        'avg_readiness': sum(h.readiness_score for h in recent_health if h.readiness_score) / len([h for h in recent_health if h.readiness_score]) if any(h.readiness_score for h in recent_health) else None,
+                        'avg_sleep': sum(h.sleep_duration_minutes for h in recent_health if h.sleep_duration_minutes) / len([h for h in recent_health if h.sleep_duration_minutes]) if any(h.sleep_duration_minutes for h in recent_health) else None,
+                        'avg_stress': sum(h.stress_level for h in recent_health if h.stress_level) / len([h for h in recent_health if h.stress_level]) if any(h.stress_level for h in recent_health) else None,
+                    }
+            except Exception as e:
+                logger.warning(f"Error fetching health metrics for adaptation: {e}")
+                health_metrics = {}
+        
+        # Calculate adherence and performance metrics
         planned_workouts = []
         for week in plan_data.get('weeks', []):
             planned_workouts.extend(week.get('workouts', []))
         
         adherence = len(actual_workouts) / len(planned_workouts) if planned_workouts else 0
         
-        # Analyze performance vs plan
+        # Analyze actual performance
+        if actual_workouts:
+            actual_avg_pace = sum(w.avg_pace for w in actual_workouts if w.avg_pace) / len([w for w in actual_workouts if w.avg_pace]) if any(w.avg_pace for w in actual_workouts) else None
+            actual_total_km = sum(w.distance_meters for w in actual_workouts) / 1000
+            planned_total_km = sum(w.get('distance_km', 0) for w in planned_workouts[:len(actual_workouts)])
+            volume_deviation = ((actual_total_km - planned_total_km) / planned_total_km * 100) if planned_total_km > 0 else 0
+        else:
+            actual_avg_pace = None
+            volume_deviation = 0
+        
+        # Build comprehensive context
         performance_context = f"""ADHERENCIA AL PLAN:
 - Entrenamientos completados: {len(actual_workouts)} de {len(planned_workouts)} ({adherence*100:.0f}%)
-
-AJUSTES NECESARIOS:
+- Volumen realizado vs planificado: {volume_deviation:+.1f}%
 """
         
+        if actual_avg_pace:
+            performance_context += f"- Ritmo promedio real: {actual_avg_pace/60:.2f} min/km\n"
+        
+        # Health metrics context
+        if health_metrics:
+            health_context = "\nMÉTRICAS DE SALUD (última semana):\n"
+            if health_metrics.get('avg_hrv'):
+                hrv = health_metrics['avg_hrv']
+                health_context += f"- HRV promedio: {hrv:.0f} ms "
+                if hrv < 30:
+                    health_context += "(⚠️ Bajo - considerar recuperación)\n"
+                elif hrv > 50:
+                    health_context += "(✓ Bueno)\n"
+                else:
+                    health_context += "(Moderado)\n"
+            
+            if health_metrics.get('avg_readiness'):
+                readiness = health_metrics['avg_readiness']
+                health_context += f"- Readiness promedio: {readiness:.0f}/100 "
+                if readiness < 50:
+                    health_context += "(⚠️ Bajo - reducir carga)\n"
+                elif readiness > 75:
+                    health_context += "(✓ Excelente - puede aumentar)\n"
+                else:
+                    health_context += "(Moderado)\n"
+            
+            if health_metrics.get('avg_sleep'):
+                sleep = health_metrics['avg_sleep'] / 60
+                health_context += f"- Sueño promedio: {sleep:.1f} horas/noche "
+                if sleep < 6:
+                    health_context += "(⚠️ Insuficiente)\n"
+                elif sleep >= 7:
+                    health_context += "(✓ Adecuado)\n"
+                else:
+                    health_context += "(Moderado)\n"
+            
+            performance_context += health_context
+        
+        # Adaptation recommendations
+        recommendations = []
         if adherence < 0.7:
-            performance_context += "- Reducir volumen (baja adherencia)\n"
+            recommendations.append("- Reducir volumen semanal (baja adherencia)")
         elif adherence > 0.95:
-            performance_context += "- Puede aumentar intensidad (excelente adherencia)\n"
+            recommendations.append("- Puede aumentar intensidad ligeramente (excelente adherencia)")
+        
+        if volume_deviation < -20:
+            recommendations.append("- Volumen muy por debajo - reducir objetivos")
+        elif volume_deviation > 30:
+            recommendations.append("- Volumen muy por encima - riesgo de sobreentrenamiento")
+        
+        if health_metrics:
+            if health_metrics.get('avg_readiness') and health_metrics['avg_readiness'] < 50:
+                recommendations.append("- Readiness bajo - aumentar recuperación, reducir intensidad")
+            if health_metrics.get('avg_hrv') and health_metrics['avg_hrv'] < 30:
+                recommendations.append("- HRV bajo - priorizar descanso")
+        
+        performance_context += "\nRECOMENDACIONES DE AJUSTE:\n"
+        for rec in recommendations:
+            performance_context += f"{rec}\n"
         
         # Build adaptation prompt
         prompt = f"""{performance_context}
 
-PLAN ACTUAL:
-{json.dumps(plan_data, indent=2)}
+PLAN ACTUAL (últimas semanas completadas):
+{json.dumps({k: v for k, v in plan_data.items() if k != 'weeks'}, indent=2)}
 
-Adapta las próximas 4 semanas del plan basándote en el progreso real.
-Mantén el objetivo pero ajusta volumen e intensidad según adherencia y rendimiento.
+Semanas del plan actual (para referencia):
+{json.dumps(plan_data.get('weeks', [])[-4:], indent=2)}
 
-Responde en JSON con las semanas actualizadas."""
+OBJETIVO: Adapta las próximas 4 semanas del plan basándote en:
+1. Progreso real (adherencia, volumen realizado)
+2. Métricas de salud (HRV, readiness, sueño)
+3. Rendimiento actual vs objetivos
+
+INSTRUCCIONES:
+- Mantén el objetivo general del plan
+- Ajusta volumen e intensidad según el análisis
+- Incrementa progresión si el rendimiento es mejor de lo esperado
+- Reduce carga si hay signos de fatiga o baja adherencia
+- Incluye semanas de recuperación si es necesario
+
+Responde SOLO con JSON válido conteniendo las semanas adaptadas (misma estructura que el plan actual)."""
 
         try:
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "Eres un entrenador que adapta planes según progreso real."},
+                    {
+                        "role": "system",
+                        "content": "Eres un entrenador experto que adapta planes de entrenamiento basándote en datos reales de rendimiento y salud. Generas solo JSON válido con semanas adaptadas."
+                    },
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=3000
+                max_tokens=4000
             )
             
-            import json
             adapted_text = completion.choices[0].message.content
             
-            if "```json" in adapted_text:
-                adapted_text = adapted_text.split("```json")[1].split("```")[0].strip()
+            # Parse with robust parsing
+            adapted_weeks = self._parse_ai_response(
+                adapted_text,
+                {'type': 'adaptation'},
+                4,  # 4 weeks
+                max_attempts=3
+            )
             
-            adapted_data = json.loads(adapted_text)
-            adapted_data['adapted_at'] = datetime.utcnow().isoformat()
-            adapted_data['tokens_used'] = completion.usage.total_tokens
+            # Ensure we have weeks structure
+            if 'weeks' not in adapted_weeks:
+                # If AI returned just weeks array, wrap it
+                if isinstance(adapted_weeks, list):
+                    adapted_weeks = {'weeks': adapted_weeks}
             
-            return adapted_data
+            adapted_weeks['adapted_at'] = datetime.utcnow().isoformat()
+            adapted_weeks['tokens_used'] = completion.usage.total_tokens
+            adapted_weeks['adaptation_reason'] = '; '.join(recommendations) if recommendations else 'Ajuste basado en progreso'
+            
+            return adapted_weeks
             
         except Exception as e:
+            logger.error(f"Error adapting plan: {e}", exc_info=True)
             raise Exception(f"Error adapting plan: {str(e)}")
     
     def _create_fallback_plan(self, goal: Dict[str, Any], weeks: int) -> Dict[str, Any]:
