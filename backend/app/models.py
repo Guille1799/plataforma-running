@@ -143,6 +143,9 @@ class User(Base):
     workouts = relationship(
         "Workout", back_populates="user", cascade="all, delete-orphan"
     )
+    training_plans = relationship(
+        "TrainingPlan", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Workout(Base):
@@ -414,4 +417,55 @@ class Event(Base):
     __table_args__ = (
         Index('ix_events_date_verified', 'date', 'verified'),
         Index('ix_events_country_date', 'country', 'date'),
+    )
+
+
+class TrainingPlan(Base):
+    """Training plan model representing AI-generated personalized training plans.
+    
+    Stores complete training plans with weekly structure, workouts, and tracking data.
+    Plans are stored as JSON for flexibility while maintaining relational structure for queries.
+    
+    Attributes:
+        id: Unique identifier (primary key)
+        user_id: Foreign key to User
+        plan_id: Unique plan identifier (used in API responses)
+        plan_name: Name of the training plan
+        goal_type: Type of goal (marathon, 10k, improve_fitness, etc.)
+        goal_date: Target race/event date (optional)
+        start_date: When the plan starts
+        end_date: When the plan ends
+        total_weeks: Total number of weeks in the plan
+        current_week: Current week being executed (1-based)
+        status: Plan status (active, completed, paused, archived)
+        plan_data: Complete plan structure as JSON (weeks, workouts, metrics)
+        metrics: Calculated metrics (total_km, total_workouts, etc.)
+        created_at: When the plan was created
+        updated_at: Last update timestamp
+    """
+    
+    __tablename__ = "training_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    plan_id = Column(String, unique=True, nullable=False, index=True)
+    plan_name = Column(String, nullable=False)
+    goal_type = Column(String, nullable=False)
+    goal_date = Column(DateTime, nullable=True)
+    start_date = Column(DateTime, nullable=False)
+    end_date = Column(DateTime, nullable=False)
+    total_weeks = Column(Integer, nullable=False)
+    current_week = Column(Integer, default=1, nullable=False)
+    status = Column(String, default="active", nullable=False)  # active, completed, paused, archived
+    plan_data = Column(JSON, nullable=False)  # Complete plan structure
+    metrics = Column(JSON, nullable=True)  # Calculated metrics
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = relationship("User", back_populates="training_plans")
+    
+    __table_args__ = (
+        Index('ix_training_plans_user_status', 'user_id', 'status'),
+        Index('ix_training_plans_start_date', 'start_date'),
     )

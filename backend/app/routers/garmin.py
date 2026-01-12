@@ -47,7 +47,13 @@ def connect_garmin(
     
     Saves encrypted Garmin credentials for future syncs.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"[GARMIN ROUTER] Connect request received for user {current_user.id}")
+        print(f"[GARMIN ROUTER] Connect request received for user {current_user.id}", flush=True)
+        
         user = garmin_service.connect_user_garmin(
             db,
             current_user.id,
@@ -55,12 +61,19 @@ def connect_garmin(
             request.password
         )
         
+        logger.info(f"[GARMIN ROUTER] Connection successful for user {current_user.id}")
+        print(f"[GARMIN ROUTER] Connection successful for user {current_user.id}", flush=True)
+        
         return {
             "message": "Garmin account connected successfully",
             "garmin_email": user.garmin_email,
             "connected_at": user.garmin_connected_at.isoformat()
         }
     except Exception as e:
+        logger.error(f"[GARMIN ROUTER] Connect failed for user {current_user.id}: {str(e)}", exc_info=True)
+        print(f"[GARMIN ROUTER] [ERROR] Connect failed for user {current_user.id}: {str(e)}", flush=True)
+        import traceback
+        print(f"[GARMIN ROUTER] Traceback:\n{traceback.format_exc()}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to connect Garmin: {str(e)}"
@@ -78,7 +91,37 @@ def sync_activities(
     
     Downloads and processes FIT files for running activities.
     """
+    import logging
+    import json
+    import os
+    from datetime import datetime
+    logger = logging.getLogger(__name__)
+    
+    # Write to debug log file
+    DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
     try:
+        log_dir = os.path.dirname(DEBUG_LOG_PATH)
+        os.makedirs(log_dir, exist_ok=True)
+        log_entry = {
+            "timestamp": int(datetime.utcnow().timestamp() * 1000),
+            "location": "garmin.py:sync_activities",
+            "message": "[GARMIN ROUTER] Sync request received",
+            "level": "info",
+            "data": {"user_id": current_user.id},
+            "sessionId": "debug-session",
+            "runId": "garmin-debug",
+            "hypothesisId": "H0"
+        }
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            f.flush()
+    except:
+        pass
+    
+    try:
+        logger.info(f"[GARMIN ROUTER] Sync request received for user {current_user.id}")
+        print(f"[GARMIN ROUTER] Sync request received for user {current_user.id}", flush=True)
+        
         # Parse dates (handle None request or empty values)
         start_date = None
         end_date = None
@@ -95,6 +138,9 @@ def sync_activities(
             except ValueError:
                 pass
         
+        logger.info(f"[GARMIN ROUTER] Calling sync_user_activities for user {current_user.id}")
+        print(f"[GARMIN ROUTER] Calling sync_user_activities for user {current_user.id}", flush=True)
+        
         # Sync
         workouts = garmin_service.sync_user_activities(
             db,
@@ -102,6 +148,9 @@ def sync_activities(
             start_date,
             end_date
         )
+        
+        logger.info(f"[GARMIN ROUTER] Sync completed: {len(workouts)} workouts synced")
+        print(f"[GARMIN ROUTER] Sync completed: {len(workouts)} workouts synced", flush=True)
         
         # Update last sync time
         from datetime import datetime
@@ -115,9 +164,10 @@ def sync_activities(
             "activity_ids": [w.id for w in workouts]
         }
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Garmin sync failed for user {current_user.id}: {str(e)}", exc_info=True)
+        logger.error(f"[GARMIN ROUTER] Garmin sync failed for user {current_user.id}: {str(e)}", exc_info=True)
+        print(f"[GARMIN ROUTER] [ERROR] Garmin sync failed for user {current_user.id}: {str(e)}", flush=True)
+        import traceback
+        print(f"[GARMIN ROUTER] Traceback:\n{traceback.format_exc()}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Sync failed: {str(e)}"

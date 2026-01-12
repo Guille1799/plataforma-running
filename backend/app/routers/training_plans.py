@@ -12,8 +12,12 @@ from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.models import User
+from app.models import User, TrainingPlan
 from app.services.training_plan_service import get_training_plan_service
+from app.services.training_plan_tracking_service import get_tracking_service
+from app.services.training_plan_matching_service import get_matching_service
+from app.services.training_plan_export_service import get_export_service
+from app import crud
 from app.utils.rate_limiter import limiter
 from app.dependencies.auth import get_current_user
 from app import schemas
@@ -527,6 +531,534 @@ def get_training_plan(
     )
 
 
+@router.get("/{plan_id}/progress", response_model=dict)
+def get_plan_progress(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive progress metrics for a training plan.
+    
+    Returns adherence, progress, deviations, and current week metrics.
+    
+    **Requires authentication**
+    """
+    # For now, get from user.preferences (legacy)
+    # TODO: Migrate to TrainingPlan model
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_dict = next((p for p in plans if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if not plan_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    # Convert dict to TrainingPlan-like object for tracking service
+    # This is a temporary solution until we migrate fully to TrainingPlan model
+    class PlanWrapper:
+        def __init__(self, data: dict, user_id: int):
+            self.plan_data = data
+            self.user_id = user_id
+            self.current_week = data.get('current_week', 1)
+            self.total_weeks = data.get('total_weeks', len(data.get('weeks', [])))
+            start_date_str = data.get('start_date')
+            if isinstance(start_date_str, str):
+                self.start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            else:
+                self.start_date = start_date_str or datetime.utcnow()
+    
+    plan_wrapper = PlanWrapper(plan_dict, current_user.id)
+    
+    # Calculate metrics
+    tracking_service = get_tracking_service()
+    metrics = tracking_service.calculate_metrics(plan_wrapper, db)
+    
+    return metrics
+
+
+@router.get("/{plan_id}/adherence", response_model=dict)
+def get_plan_adherence(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get adherence metrics for a training plan.
+    
+    Returns percentage of workouts completed and related metrics.
+    
+    **Requires authentication**
+    """
+    # Similar to get_plan_progress, get from user.preferences for now
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_dict = next((p for p in plans if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if not plan_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    class PlanWrapper:
+        def __init__(self, data: dict, user_id: int):
+            self.plan_data = data
+            self.user_id = user_id
+            self.current_week = data.get('current_week', 1)
+            self.total_weeks = data.get('total_weeks', len(data.get('weeks', [])))
+            start_date_str = data.get('start_date')
+            if isinstance(start_date_str, str):
+                self.start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            else:
+                self.start_date = start_date_str or datetime.utcnow()
+    
+    plan_wrapper = PlanWrapper(plan_dict, current_user.id)
+    tracking_service = get_tracking_service()
+    adherence = tracking_service.calculate_adherence(plan_wrapper, db)
+    
+    return adherence
+
+
+@router.get("/{plan_id}/deviations", response_model=dict)
+def get_plan_deviations(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get detected deviations from the training plan.
+    
+    Returns list of deviations with recommendations.
+    
+    **Requires authentication**
+    """
+    # Similar pattern to get_plan_progress
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_dict = next((p for p in plans if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if not plan_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    class PlanWrapper:
+        def __init__(self, data: dict, user_id: int):
+            self.plan_data = data
+            self.user_id = user_id
+            self.current_week = data.get('current_week', 1)
+            self.total_weeks = data.get('total_weeks', len(data.get('weeks', [])))
+            start_date_str = data.get('start_date')
+            if isinstance(start_date_str, str):
+                self.start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+            else:
+                self.start_date = start_date_str or datetime.utcnow()
+    
+    plan_wrapper = PlanWrapper(plan_dict, current_user.id)
+    tracking_service = get_tracking_service()
+    deviations = tracking_service.detect_deviations(plan_wrapper, db)
+    
+    return {
+        'deviations': deviations,
+        'count': len(deviations),
+        'has_deviations': len(deviations) > 0,
+    }
+
+
+@router.put("/{plan_id}/weeks/{week_num}/workouts/{workout_index}", response_model=dict)
+def update_plan_workout(
+    plan_id: str,
+    week_num: int,
+    workout_index: int,
+    workout_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update a specific workout in a training plan.
+    
+    **Requires authentication**
+    """
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_index = next((i for i, p in enumerate(plans) if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if plan_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    plan_dict = plans[plan_index]
+    
+    # Find the week
+    week = next((w for w in plan_dict.get('weeks', []) if w.get('week') == week_num), None)
+    if not week:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Week {week_num} not found in plan"
+        )
+    
+    # Find the workout
+    workouts = week.get('workouts', [])
+    if workout_index < 0 or workout_index >= len(workouts):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workout at index {workout_index} not found"
+        )
+    
+    # Update workout
+    workouts[workout_index].update(workout_data)
+    
+    # Save changes
+    plans[plan_index] = plan_dict
+    current_user.preferences["training_plans"] = plans
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, "preferences")
+    db.commit()
+    
+    return {
+        'success': True,
+        'message': 'Workout updated successfully',
+        'workout': workouts[workout_index]
+    }
+
+
+@router.post("/{plan_id}/weeks/{week_num}/workouts", response_model=dict)
+def add_plan_workout(
+    plan_id: str,
+    week_num: int,
+    workout_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Add a new workout to a specific week in a training plan.
+    
+    **Requires authentication**
+    """
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_index = next((i for i, p in enumerate(plans) if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if plan_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    plan_dict = plans[plan_index]
+    
+    # Find the week
+    week = next((w for w in plan_dict.get('weeks', []) if w.get('week') == week_num), None)
+    if not week:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Week {week_num} not found in plan"
+        )
+    
+    # Add workout
+    if 'workouts' not in week:
+        week['workouts'] = []
+    
+    week['workouts'].append(workout_data)
+    
+    # Update week total_km if distance_km is provided
+    if workout_data.get('distance_km'):
+        week['total_km'] = week.get('total_km', 0) + workout_data['distance_km']
+    
+    # Save changes
+    plans[plan_index] = plan_dict
+    current_user.preferences["training_plans"] = plans
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, "preferences")
+    db.commit()
+    
+    return {
+        'success': True,
+        'message': 'Workout added successfully',
+        'workout': workout_data
+    }
+
+
+@router.delete("/{plan_id}/weeks/{week_num}/workouts/{workout_index}", response_model=dict)
+def delete_plan_workout(
+    plan_id: str,
+    week_num: int,
+    workout_index: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a workout from a training plan.
+    
+    **Requires authentication**
+    """
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_index = next((i for i, p in enumerate(plans) if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if plan_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    plan_dict = plans[plan_index]
+    
+    # Find the week
+    week = next((w for w in plan_dict.get('weeks', []) if w.get('week') == week_num), None)
+    if not week:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Week {week_num} not found in plan"
+        )
+    
+    # Find the workout
+    workouts = week.get('workouts', [])
+    if workout_index < 0 or workout_index >= len(workouts):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workout at index {workout_index} not found"
+        )
+    
+    # Remove workout and update week total_km
+    removed_workout = workouts.pop(workout_index)
+    if removed_workout.get('distance_km'):
+        week['total_km'] = max(0, week.get('total_km', 0) - removed_workout['distance_km'])
+    
+    # Save changes
+    plans[plan_index] = plan_dict
+    current_user.preferences["training_plans"] = plans
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, "preferences")
+    db.commit()
+    
+    return {
+        'success': True,
+        'message': 'Workout deleted successfully'
+    }
+
+
+@router.post("/{plan_id}/sync-workouts", response_model=dict)
+def sync_plan_workouts(
+    plan_id: str,
+    auto_complete: bool = True,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Synchronize plan workouts with actual completed workouts.
+    
+    Matches actual workouts with planned workouts and optionally marks them as completed.
+    
+    **Requires authentication**
+    """
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_index = next((i for i, p in enumerate(plans) if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if plan_index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    plan_dict = plans[plan_index]
+    
+    # Get start date
+    start_date_str = plan_dict.get('start_date')
+    if isinstance(start_date_str, str):
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')).date()
+    else:
+        start_date = start_date_str.date() if isinstance(start_date_str, datetime) else datetime.utcnow().date()
+    
+    # Sync workouts
+    matching_service = get_matching_service()
+    sync_result = matching_service.sync_workouts(
+        plan_dict,
+        current_user.id,
+        db,
+        start_date,
+        auto_complete=auto_complete
+    )
+    
+    # Update plan in preferences
+    plans[plan_index] = plan_dict
+    current_user.preferences["training_plans"] = plans
+    
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, "preferences")
+    db.commit()
+    
+    return {
+        'success': True,
+        'message': f"Sincronización completada: {sync_result['workouts_completed']} entrenamientos marcados como completados",
+        **sync_result
+    }
+
+
+@router.get("/{plan_id}/export/{format}")
+def export_training_plan(
+    plan_id: str,
+    format: str,  # json, csv, ical, pdf
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Export a training plan to various formats.
+    
+    Supported formats: json, csv, ical, pdf
+    
+    **Requires authentication**
+    """
+    if format not in ['json', 'csv', 'ical', 'pdf']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported format: {format}. Supported: json, csv, ical, pdf"
+        )
+    
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_dict = next((p for p in plans if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if not plan_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    export_service = get_export_service()
+    
+    # Get start date
+    start_date_str = plan_dict.get('start_date')
+    if isinstance(start_date_str, str):
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00'))
+    else:
+        start_date = start_date_str if isinstance(start_date_str, datetime) else datetime.utcnow()
+    
+    # Export based on format
+    if format == 'json':
+        content = export_service.export_to_json(plan_dict)
+        media_type = 'application/json'
+        filename = f"{plan_id}.json"
+    elif format == 'csv':
+        content = export_service.export_to_csv(plan_dict)
+        media_type = 'text/csv'
+        filename = f"{plan_id}.csv"
+    elif format == 'ical':
+        content = export_service.export_to_ical(plan_dict, start_date)
+        media_type = 'text/calendar'
+        filename = f"{plan_id}.ics"
+    elif format == 'pdf':
+        content = export_service.export_to_pdf(plan_dict)
+        media_type = 'application/pdf'
+        filename = f"{plan_id}.pdf"
+    
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+    )
+
+
+@router.get("/{plan_id}/notifications", response_model=dict)
+def get_plan_notifications(
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get notifications and reminders for a training plan.
+    
+    Returns upcoming workouts, reminders, and missed workouts.
+    
+    **Requires authentication**
+    """
+    if not current_user.preferences or "training_plans" not in current_user.preferences:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No training plans found"
+        )
+    
+    plans = current_user.preferences["training_plans"]
+    plan_dict = next((p for p in plans if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
+    
+    if not plan_dict:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Training plan '{plan_id}' not found"
+        )
+    
+    # Get start date and current week
+    start_date_str = plan_dict.get('start_date')
+    if isinstance(start_date_str, str):
+        start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')).date()
+    else:
+        start_date = start_date_str.date() if isinstance(start_date_str, datetime) else date.today()
+    
+    current_week = plan_dict.get('current_week', 1)
+    
+    # Generate notifications
+    notification_service = get_notification_service()
+    summary = notification_service.generate_notification_summary(
+        plan_dict,
+        start_date,
+        current_week
+    )
+    
+    return summary
+
+
 @router.put("/{plan_id}/status")
 def update_plan_status(
     plan_id: str,
@@ -592,25 +1124,200 @@ def delete_training_plan(
     
     **Requires authentication**
     """
+    logger.info(
+        f"DELETE training plan request: plan_id={plan_id}, user_id={current_user.id}",
+        extra={
+            "plan_id": plan_id,
+            "user_id": current_user.id,
+            "user_email": current_user.email,
+        }
+    )
+    
     if not current_user.preferences or "training_plans" not in current_user.preferences:
+        logger.warning(f"No training plans found for user {current_user.id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No training plans found"
         )
     
     plans = current_user.preferences["training_plans"]
+    logger.debug(f"Current plans count before delete: {len(plans)}")
+    
     plan_index = next((i for i, p in enumerate(plans) if isinstance(p, dict) and p.get("plan_id") == plan_id), None)
     
     if plan_index is None:
+        logger.warning(f"Plan {plan_id} not found in user {current_user.id}'s plans")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Training plan '{plan_id}' not found"
         )
     
-    # Remove plan
-    del plans[plan_index]
-    current_user.preferences["training_plans"] = plans
-    db.commit()
+    # Log the plan being deleted
+    plan_to_delete = plans[plan_index]
+    logger.info(
+        f"Deleting plan: plan_id={plan_id}, plan_name={plan_to_delete.get('plan_name')}",
+        extra={
+            "plan_id": plan_id,
+            "plan_name": plan_to_delete.get("plan_name"),
+            "user_id": current_user.id,
+        }
+    )
+    
+    # Remove plan from list
+    updated_plans = [p for i, p in enumerate(plans) if i != plan_index]
+    
+    # Use direct SQL UPDATE to ensure it works correctly with SQLite JSON
+    # This is more reliable than relying on SQLAlchemy's JSON change detection
+    from sqlalchemy import text
+    from app.database import engine
+    
+    # Get current preferences as dict
+    current_prefs = dict(current_user.preferences) if current_user.preferences else {}
+    current_prefs["training_plans"] = updated_plans
+    
+    # Detect database type
+    db_url = str(engine.url)
+    is_postgres = 'postgresql' in db_url or 'postgres' in db_url
+    
+    try:
+        # Update using raw SQL - this ensures the change is persisted correctly
+        if is_postgres:
+            # PostgreSQL: use JSONB cast
+            db.execute(
+                text("UPDATE users SET preferences = :prefs::jsonb WHERE id = :user_id"),
+                {"prefs": json.dumps(current_prefs), "user_id": current_user.id}
+            )
+        else:
+            # SQLite: JSON stored as text
+            db.execute(
+                text("UPDATE users SET preferences = :prefs WHERE id = :user_id"),
+                {"prefs": json.dumps(current_prefs), "user_id": current_user.id}
+            )
+        
+        db.commit()
+        logger.info(f"Committed deletion of plan {plan_id} using direct SQL. Plans before: {len(plans)}, after: {len(updated_plans)}")
+        
+        # Also update the in-memory object for consistency
+        current_user.preferences = current_prefs
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_user, "preferences")
+        
+    except Exception as e:
+        logger.error(f"Failed to delete plan using direct SQL: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist deletion to database"
+        )
+    
+    # Verify deletion by querying database directly
+    result = db.execute(
+        text("SELECT preferences FROM users WHERE id = :user_id"),
+        {"user_id": current_user.id}
+    )
+    db_prefs = result.scalar_one()
+    
+    # Refresh the user object
+    db.refresh(current_user)
+    
+    # Get plans after deletion from the database query result (not from session cache)
+    if db_prefs and isinstance(db_prefs, dict) and "training_plans" in db_prefs:
+        plans_after = db_prefs.get("training_plans", [])
+    else:
+        plans_after = []
+    
+    remaining_plan_ids = [p.get("plan_id") for p in plans_after if isinstance(p, dict) and p.get("plan_id")]
+    
+    logger.info(
+        f"Plan deleted. Remaining plans count: {len(plans_after)}, remaining plan_ids: {remaining_plan_ids}",
+        extra={
+            "plan_id": plan_id,
+            "user_id": current_user.id,
+            "plans_before": len(plans),
+            "plans_after": len(plans_after),
+            "remaining_plan_ids": remaining_plan_ids,
+        }
+    )
+    
+    # Double-check the plan is gone
+    if plan_id in remaining_plan_ids:
+        logger.error(
+            f"CRITICAL: Plan {plan_id} still exists after deletion!",
+            extra={
+                "plan_id": plan_id,
+                "user_id": current_user.id,
+                "remaining_plan_ids": remaining_plan_ids,
+                "all_plans": plans_after,
+            }
+        )
+        # Try one more time with direct database update using SQL
+        from sqlalchemy import text
+        from app.database import engine
+        
+        try:
+            # Detect database type
+            db_url = str(engine.url)
+            is_postgres = 'postgresql' in db_url or 'postgres' in db_url
+            
+            # Get raw preferences JSON and update it
+            result = db.execute(
+                text("SELECT preferences FROM users WHERE id = :user_id"),
+                {"user_id": current_user.id}
+            )
+            raw_prefs = result.scalar_one()
+            
+            if raw_prefs and isinstance(raw_prefs, dict) and "training_plans" in raw_prefs:
+                # Filter out the deleted plan
+                raw_prefs["training_plans"] = [
+                    p for p in raw_prefs["training_plans"] 
+                    if isinstance(p, dict) and p.get("plan_id") != plan_id
+                ]
+                
+                # Update using raw SQL - handle both PostgreSQL (JSONB) and SQLite (JSON)
+                if is_postgres:
+                    # PostgreSQL: use JSONB cast
+                    db.execute(
+                        text("UPDATE users SET preferences = :prefs::jsonb WHERE id = :user_id"),
+                        {"prefs": json.dumps(raw_prefs), "user_id": current_user.id}
+                    )
+                else:
+                    # SQLite: just use JSON string
+                    db.execute(
+                        text("UPDATE users SET preferences = :prefs WHERE id = :user_id"),
+                        {"prefs": json.dumps(raw_prefs), "user_id": current_user.id}
+                    )
+                
+                db.commit()
+                
+                # Verify the update
+                result_after = db.execute(
+                    text("SELECT preferences FROM users WHERE id = :user_id"),
+                    {"user_id": current_user.id}
+                )
+                prefs_after = result_after.scalar_one()
+                plans_after_sql = prefs_after.get("training_plans", []) if prefs_after and isinstance(prefs_after, dict) else []
+                remaining_ids = [p.get("plan_id") for p in plans_after_sql if isinstance(p, dict) and p.get("plan_id")]
+                
+                if plan_id not in remaining_ids:
+                    logger.info(f"Successfully removed plan {plan_id} using direct SQL update. Remaining: {remaining_ids}")
+                else:
+                    logger.error(f"CRITICAL: Plan {plan_id} still exists after direct SQL update!")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to delete training plan even with direct SQL"
+                    )
+            else:
+                logger.error(f"Invalid preferences format: {type(raw_prefs)}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Direct SQL update also failed: {e}", exc_info=True)
+            db.rollback()
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete training plan"
+        )
     
     return None  # 204 No Content
 

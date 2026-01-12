@@ -233,3 +233,193 @@ def get_user_workout_stats(db: Session, user_id: int) -> schemas.WorkoutStats:
         total_calories=round(total_calories, 2) if total_calories else None,
         sports_breakdown=sports_breakdown,
     )
+
+
+# ============================================================================
+# TRAINING PLAN CRUD OPERATIONS
+# ============================================================================
+
+
+def create_training_plan(
+    db: Session,
+    user_id: int,
+    plan_id: str,
+    plan_name: str,
+    goal_type: str,
+    goal_date: datetime | None,
+    start_date: datetime,
+    end_date: datetime,
+    total_weeks: int,
+    plan_data: dict,
+    metrics: dict | None = None,
+    status: str = "active",
+    current_week: int = 1,
+) -> models.TrainingPlan:
+    """Create a new training plan in the database.
+    
+    Args:
+        db: Database session
+        user_id: User ID who owns the plan
+        plan_id: Unique plan identifier
+        plan_name: Name of the training plan
+        goal_type: Type of goal (5k, 10k, marathon, etc.)
+        goal_date: Target race/event date (optional)
+        start_date: When the plan starts
+        end_date: When the plan ends
+        total_weeks: Total number of weeks in the plan
+        plan_data: Complete plan structure (JSON)
+        metrics: Calculated metrics (JSON, optional)
+        status: Plan status (active, completed, paused, archived)
+        current_week: Current week being executed (1-based)
+        
+    Returns:
+        Created TrainingPlan object
+    """
+    db_plan = models.TrainingPlan(
+        user_id=user_id,
+        plan_id=plan_id,
+        plan_name=plan_name,
+        goal_type=goal_type,
+        goal_date=goal_date,
+        start_date=start_date,
+        end_date=end_date,
+        total_weeks=total_weeks,
+        current_week=current_week,
+        status=status,
+        plan_data=plan_data,
+        metrics=metrics,
+    )
+    db.add(db_plan)
+    db.commit()
+    db.refresh(db_plan)
+    return db_plan
+
+
+def get_training_plan_by_id(
+    db: Session, plan_id: str, user_id: int | None = None
+) -> models.TrainingPlan | None:
+    """Get training plan by plan_id.
+    
+    Args:
+        db: Database session
+        plan_id: Unique plan identifier
+        user_id: Optional user ID to filter by ownership
+        
+    Returns:
+        TrainingPlan object if found, None otherwise
+    """
+    query = db.query(models.TrainingPlan).filter(models.TrainingPlan.plan_id == plan_id)
+    if user_id is not None:
+        query = query.filter(models.TrainingPlan.user_id == user_id)
+    return query.first()
+
+
+def get_training_plan_by_db_id(
+    db: Session, id: int, user_id: int | None = None
+) -> models.TrainingPlan | None:
+    """Get training plan by database ID.
+    
+    Args:
+        db: Database session
+        id: Database primary key ID
+        user_id: Optional user ID to filter by ownership
+        
+    Returns:
+        TrainingPlan object if found, None otherwise
+    """
+    query = db.query(models.TrainingPlan).filter(models.TrainingPlan.id == id)
+    if user_id is not None:
+        query = query.filter(models.TrainingPlan.user_id == user_id)
+    return query.first()
+
+
+def get_user_training_plans(
+    db: Session,
+    user_id: int,
+    status: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[models.TrainingPlan]:
+    """Get all training plans for a user.
+    
+    Args:
+        db: Database session
+        user_id: User ID
+        status: Optional status filter (active, completed, paused, archived)
+        limit: Maximum number of plans to return
+        offset: Number of plans to skip
+        
+    Returns:
+        List of TrainingPlan objects
+    """
+    query = db.query(models.TrainingPlan).filter(models.TrainingPlan.user_id == user_id)
+    if status is not None:
+        query = query.filter(models.TrainingPlan.status == status)
+    return (
+        query.order_by(models.TrainingPlan.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
+
+
+def update_training_plan(
+    db: Session,
+    plan_id: str,
+    user_id: int,
+    updates: dict,
+) -> models.TrainingPlan | None:
+    """Update a training plan.
+    
+    Args:
+        db: Database session
+        plan_id: Unique plan identifier
+        user_id: User ID (for ownership verification)
+        updates: Dictionary of fields to update
+        
+    Returns:
+        Updated TrainingPlan object, or None if not found
+    """
+    plan = get_training_plan_by_id(db, plan_id, user_id)
+    if not plan:
+        return None
+    
+    # Update allowed fields
+    allowed_fields = [
+        "plan_name",
+        "status",
+        "current_week",
+        "plan_data",
+        "metrics",
+        "goal_date",
+    ]
+    for field in allowed_fields:
+        if field in updates:
+            setattr(plan, field, updates[field])
+    
+    plan.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+def delete_training_plan(
+    db: Session, plan_id: str, user_id: int
+) -> bool:
+    """Delete a training plan.
+    
+    Args:
+        db: Database session
+        plan_id: Unique plan identifier
+        user_id: User ID (for ownership verification)
+        
+    Returns:
+        True if deleted, False if not found
+    """
+    plan = get_training_plan_by_id(db, plan_id, user_id)
+    if not plan:
+        return False
+    
+    db.delete(plan)
+    db.commit()
+    return True

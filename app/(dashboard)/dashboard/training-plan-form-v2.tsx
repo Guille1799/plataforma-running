@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api-client';
 import { useCalculateDurationWithRace, useDurationOptions } from '@/lib/hooks/useTrainingPlanDuration';
 
@@ -43,6 +44,7 @@ interface PlanFormData {
 }
 
 export function TrainingPlanFormV2({ onPlanCreated }: { onPlanCreated: (plan: any) => void }) {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [raceSearchQuery, setRaceSearchQuery] = useState('');

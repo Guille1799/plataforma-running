@@ -106,7 +106,7 @@ export function ReadinessBadge() {
             {/* Info */}
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm">Readiness</p>
+                <p className="font-semibold text-sm">Preparación</p>
                 {trendIcon}
               </div>
               <Badge variant={confidenceBadge.variant} className="text-xs">

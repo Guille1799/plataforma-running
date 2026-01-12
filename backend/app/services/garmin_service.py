@@ -8,6 +8,7 @@ import json
 import zipfile
 import tempfile
 import os
+import sys
 import logging
 from pathlib import Path
 from datetime import datetime, date, timedelta
@@ -22,6 +23,65 @@ from .. import models, crud
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Helper function to print, log, and write to debug log file
+DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+
+def log_print(message: str, level: str = "info", hypothesis_id: str = None, data: dict = None):
+    """Print message, log it, and write to debug log file with timestamp."""
+    import json
+    from datetime import datetime
+    
+    # Add timestamp and format message for console output
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    formatted_message = f"[{timestamp}] [GARMIN] {message}"
+    
+    # Use Python logger (uvicorn will display this in terminal)
+    # Format with timestamp so it's visible
+    if level == "info":
+        logger.info(formatted_message)
+    elif level == "warning":
+        logger.warning(formatted_message)
+    elif level == "error":
+        logger.error(formatted_message)
+    elif level == "debug":
+        logger.debug(formatted_message)
+    else:
+        logger.info(formatted_message)
+    
+    # Also print to stdout with flush (for immediate visibility)
+    # This ensures logs appear even if uvicorn logging is misconfigured
+    print(formatted_message, file=sys.stdout, flush=True)
+    
+    # Force flush both streams
+    sys.stdout.flush()
+    sys.stderr.flush()
+    
+    # Write to debug log file (NDJSON format)
+    try:
+        log_entry = {
+            "timestamp": int(datetime.utcnow().timestamp() * 1000),
+            "location": f"garmin_service.py",
+            "message": message,
+            "level": level,
+            "data": data or {},
+            "sessionId": "debug-session",
+            "runId": "garmin-debug",
+        }
+        if hypothesis_id:
+            log_entry["hypothesisId"] = hypothesis_id
+        
+        # Ensure directory exists
+        log_dir = os.path.dirname(DEBUG_LOG_PATH)
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # Append to debug log file
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            f.flush()
+    except Exception as e:
+        # Don't let debug logging break the app
+        pass
 
 # Encryption key (should be in settings)
 # Generate a Fernet-compatible key from secret_key
@@ -111,7 +171,8 @@ def connect_user_garmin(
 ) -> models.User:
     """
     Connect a user's Garmin account.
-    Stores encrypted email + password for re-authentication.
+    Authenticates with Garmin and saves OAuth tokens for future use.
+    Also stores encrypted email + password as backup.
 
     Args:
         db: Database session
@@ -121,12 +182,149 @@ def connect_user_garmin(
 
     Returns:
         Updated User model
-    """
-    # Note: We don't verify credentials here to avoid blocking on Garmin's OAuth
-    # Verification happens during first sync when we actually need the connection
-    logger.info(f"Storing Garmin credentials for {email}", extra={"user_id": user_id})
 
-    # Store email + encrypted password (most reliable for garth re-auth)
+    Raises:
+        Exception: If authentication fails
+    """
+    logger.info(f"Connecting Garmin account for {email}", extra={"user_id": user_id})
+
+    # Configure garth
+    garth.configure(timeout=120, domain="garmin.com")
+
+    # Authenticate with Garmin to get OAuth tokens
+    # #region agent log
+    log_print(f"[GARMIN CONNECT] Logging in with garth for user {user_id}...", hypothesis_id="H1", data={"user_id": user_id, "step": "start_login"})
+    # #endregion
+    try:
+        garth.login(email, password)
+        garth.configure(domain="garmin.com")
+        # #region agent log
+        log_print(f"[GARMIN CONNECT] Login successful", hypothesis_id="H1", data={"user_id": user_id, "step": "login_success"})
+        # #endregion
+    except Exception as e:
+        import traceback
+        error_detail = str(e)
+        traceback_str = traceback.format_exc()
+        logger.error(f"Garmin authentication failed: {error_detail}", exc_info=True)
+        log_print(f"[GARMIN CONNECT] [ERROR] Authentication failed: {error_detail}", level="error", hypothesis_id="H1", data={"error": error_detail, "traceback": traceback_str})
+        
+        # Try to identify specific error types
+        if "401" in error_detail or "Unauthorized" in error_detail:
+            raise Exception(f"Invalid Garmin credentials (email or password incorrect)")
+        elif "429" in error_detail or "rate limit" in error_detail.lower():
+            raise Exception(f"Garmin rate limit exceeded. Please try again later.")
+        else:
+            raise Exception(f"Failed to authenticate with Garmin: {error_detail}")
+
+    # Set up persistent directory for OAuth tokens
+    # Use __file__ to reliably get backend directory
+    # __file__ is backend/app/services/garmin_service.py
+    # We want backend/garmin_tokens (go up 2 levels: services -> app, then up 1 more to backend)
+    service_file = os.path.abspath(__file__)  # Full path to this file
+    services_dir = os.path.dirname(service_file)  # backend/app/services
+    app_dir = os.path.dirname(services_dir)  # backend/app
+    backend_dir = os.path.dirname(app_dir)  # backend
+    if os.name == 'nt':  # Windows
+        persistent_dir = os.path.join(backend_dir, "garmin_tokens")
+    else:  # Linux/Docker
+        persistent_dir = "/app/garmin_tokens"
+    user_token_dir = os.path.join(persistent_dir, f"user_{user_id}")
+    os.makedirs(user_token_dir, exist_ok=True)
+    # #region agent log
+    log_print(f"[GARMIN CONNECT] Service file: {service_file}", hypothesis_id="H2", data={"service_file": service_file})
+    log_print(f"[GARMIN CONNECT] Backend dir: {backend_dir}", hypothesis_id="H2", data={"backend_dir": backend_dir})
+    log_print(f"[GARMIN CONNECT] Token directory: {user_token_dir}", hypothesis_id="H2", data={"token_dir": user_token_dir, "user_id": user_id})
+    log_print(f"[GARMIN CONNECT] Directory exists: {os.path.exists(user_token_dir)}", hypothesis_id="H2", data={"token_dir": user_token_dir, "exists": os.path.exists(user_token_dir)})
+    # #endregion
+
+    # Save OAuth tokens to persistent directory
+    # #region agent log
+    log_print(f"[GARMIN CONNECT] Saving OAuth tokens to {user_token_dir}", hypothesis_id="H3", data={"token_dir": user_token_dir, "step": "before_save"})
+    # #endregion
+    try:
+        garth.save(user_token_dir)
+        # #region agent log
+        log_print(f"[GARMIN CONNECT] garth.save() completed", hypothesis_id="H3", data={"token_dir": user_token_dir, "step": "save_complete"})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        log_print(f"[GARMIN CONNECT] [ERROR] Failed to save tokens: {str(e)}", level="error", hypothesis_id="H3", data={"token_dir": user_token_dir, "error": str(e)})
+        # #endregion
+        raise
+    
+    # Verify files were saved and validate their content
+    oauth1_saved = os.path.join(user_token_dir, "oauth1_token.json")
+    oauth2_saved = os.path.join(user_token_dir, "oauth2_token.json")
+    oauth1_exists = os.path.exists(oauth1_saved)
+    oauth2_exists = os.path.exists(oauth2_saved)
+    # #region agent log
+    log_print(f"[GARMIN CONNECT] Checking token files after save", hypothesis_id="H3", data={"oauth1_exists": oauth1_exists, "oauth2_exists": oauth2_exists, "oauth1_path": oauth1_saved, "oauth2_path": oauth2_saved})
+    # #endregion
+    
+    if oauth1_exists and oauth2_exists:
+        oauth1_size = os.path.getsize(oauth1_saved)
+        oauth2_size = os.path.getsize(oauth2_saved)
+        
+        # Validate JSON content of both files
+        oauth1_valid = False
+        oauth2_valid = False
+        try:
+            with open(oauth1_saved, "r") as f:
+                oauth1_data = json.load(f)
+                oauth1_valid = isinstance(oauth1_data, dict) and len(oauth1_data) > 0
+                log_print(f"[GARMIN CONNECT] oauth1_token.json is valid JSON: {oauth1_valid}", hypothesis_id="H3", data={"oauth1_valid": oauth1_valid, "oauth1_keys": list(oauth1_data.keys()) if oauth1_valid else []})
+        except Exception as e:
+            log_print(f"[GARMIN CONNECT] [ERROR] oauth1_token.json is invalid JSON: {str(e)}", level="error", hypothesis_id="H3")
+        
+        try:
+            with open(oauth2_saved, "r") as f:
+                oauth2_data = json.load(f)
+                oauth2_valid = isinstance(oauth2_data, dict) and len(oauth2_data) > 0
+                log_print(f"[GARMIN CONNECT] oauth2_token.json is valid JSON: {oauth2_valid}", hypothesis_id="H3", data={"oauth2_valid": oauth2_valid, "oauth2_keys": list(oauth2_data.keys()) if oauth2_valid else []})
+        except Exception as e:
+            log_print(f"[GARMIN CONNECT] [ERROR] oauth2_token.json is invalid JSON: {str(e)}", level="error", hypothesis_id="H3")
+        
+        if oauth1_size > 0 and oauth2_size > 0 and oauth1_valid and oauth2_valid:
+            log_print(f"[GARMIN CONNECT] [OK] Tokens saved and validated successfully: oauth1={oauth1_size} bytes, oauth2={oauth2_size} bytes", hypothesis_id="H3", data={"oauth1_size": oauth1_size, "oauth2_size": oauth2_size})
+        else:
+            error_msg = f"Token files saved but validation failed: oauth1_size={oauth1_size}, oauth2_size={oauth2_size}, oauth1_valid={oauth1_valid}, oauth2_valid={oauth2_valid}"
+            log_print(f"[GARMIN CONNECT] [ERROR] {error_msg}", level="error", hypothesis_id="H3")
+            raise Exception(error_msg)
+    else:
+        error_msg = f"Token files not found after save: oauth1_exists={oauth1_exists}, oauth2_exists={oauth2_exists}"
+        log_print(f"[GARMIN CONNECT] [ERROR] {error_msg}", level="error", hypothesis_id="H3", data={"oauth1_exists": oauth1_exists, "oauth2_exists": oauth2_exists})
+        if os.path.exists(user_token_dir):
+            all_files = os.listdir(user_token_dir)
+            log_print(f"[GARMIN CONNECT] Files in directory: {all_files}", hypothesis_id="H3", data={"files": all_files})
+        else:
+            log_print(f"[GARMIN CONNECT] Directory does not exist: {user_token_dir}", level="error", hypothesis_id="H3")
+        raise Exception(error_msg)
+
+    # Remove email/password files for security (keep only OAuth tokens)
+    import shutil
+    allowed_files = ["oauth1_token.json", "oauth2_token.json"]
+    for filename in os.listdir(user_token_dir):
+        if filename not in allowed_files:
+            file_path = os.path.join(user_token_dir, filename)
+            os.remove(file_path)
+            log_print(f"[GARMIN CONNECT] Removed {filename} for security")
+        else:
+            # Verify file has content
+            file_path = os.path.join(user_token_dir, filename)
+            size = os.path.getsize(file_path)
+            log_print(f"[GARMIN CONNECT] Saved {filename} ({size} bytes)")
+
+    # Verify the connection works by making a test API call
+    try:
+        api = GarminConnectAPI()
+        user_name = api.get_full_name()
+        log_print(f"[GARMIN CONNECT] Verified connection for user: {user_name}")
+    except Exception as e:
+        logger.warning(f"Could not verify Garmin connection: {str(e)}", exc_info=True)
+        log_print(f"[GARMIN CONNECT] [WARNING] Could not verify connection: {str(e)}")
+        # Continue anyway - tokens are saved, verification can happen during sync
+
+    # Store email + encrypted password as backup (for re-authentication if tokens expire)
     credentials = json.dumps({"email": email, "password": password})
     encrypted_credentials = encrypt_token(credentials)
 
@@ -139,14 +337,14 @@ def connect_user_garmin(
     db.commit()
     db.refresh(user)
 
-    logger.info(f"Garmin credentials stored for user {user_id}")
+    logger.info(f"Garmin account connected successfully for user {user_id}")
     return user
 
 
 def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     """
     Get authenticated Garmin API for a user.
-    Creates Garmin instance and calls .login() explicitly.
+    Tries to restore existing session first, falls back to login if needed.
 
     Args:
         db: Database session
@@ -163,33 +361,339 @@ def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     if not user.garmin_token or not user.garmin_email:
         raise Exception("User has not connected Garmin account")
 
-    # Decrypt credentials
-    credentials_json = decrypt_token(user.garmin_token)
-    credentials = json.loads(credentials_json)
-
-    email = credentials["email"]
-    password = credentials["password"]
-
-    print(f"[GARMIN] Creating Garmin() with credentials")
-
     # Configure garth with longer timeout for large syncs (2 years of data)
     garth.configure(timeout=120)
 
-    # Use garth directly to ensure session is saved correctly
-    print(f"[GARMIN] Logging in with garth...")
-    garth.login(email, password)
-    garth.configure(domain="garmin.com")
-
-    print(f"[GARMIN] Login successful")
-
-    # Save OAuth tokens to persistent directory for Celery workers
-    persistent_dir = "/app/garmin_tokens"
+    # Persistent directory for OAuth tokens
+    # Use same path calculation as connect_user_garmin to ensure consistency
+    # Use __file__ to reliably get backend directory
+    # __file__ is backend/app/services/garmin_service.py
+    # We want backend/garmin_tokens (go up 2 levels: services -> app, then up 1 more to backend)
+    service_file = os.path.abspath(__file__)  # Full path to this file
+    services_dir = os.path.dirname(service_file)  # backend/app/services
+    app_dir = os.path.dirname(services_dir)  # backend/app
+    backend_dir = os.path.dirname(app_dir)  # backend
+    if os.name == 'nt':  # Windows
+        persistent_dir = os.path.join(backend_dir, "garmin_tokens")
+    else:  # Linux/Docker
+        persistent_dir = "/app/garmin_tokens"
     user_token_dir = os.path.join(persistent_dir, f"user_{user_id}")
     os.makedirs(user_token_dir, exist_ok=True)
+    log_print(f"[GARMIN SYNC] Service file: {service_file}")
+    log_print(f"[GARMIN SYNC] Backend dir: {backend_dir}")
+    log_print(f"[GARMIN SYNC] Token directory: {user_token_dir}")
+    log_print(f"[GARMIN SYNC] Directory exists: {os.path.exists(user_token_dir)}")
+
+    # Try to restore existing session first
+    oauth1_path = os.path.join(user_token_dir, "oauth1_token.json")
+    oauth2_path = os.path.join(user_token_dir, "oauth2_token.json")
+    
+    oauth1_exists = os.path.exists(oauth1_path)
+    oauth2_exists = os.path.exists(oauth2_path)
+    # #region agent log
+    log_print(f"[GARMIN SYNC] Checking for tokens:", hypothesis_id="H5", data={"step": "check_tokens"})
+    log_print(f"[GARMIN SYNC]   oauth1_path: {oauth1_path}", hypothesis_id="H5", data={"oauth1_path": oauth1_path})
+    log_print(f"[GARMIN SYNC]   oauth1 exists: {oauth1_exists}", hypothesis_id="H5", data={"oauth1_exists": oauth1_exists})
+    log_print(f"[GARMIN SYNC]   oauth2_path: {oauth2_path}", hypothesis_id="H5", data={"oauth2_path": oauth2_path})
+    log_print(f"[GARMIN SYNC]   oauth2 exists: {oauth2_exists}", hypothesis_id="H5", data={"oauth2_exists": oauth2_exists})
+    if os.path.exists(user_token_dir):
+        all_files = os.listdir(user_token_dir)
+        log_print(f"[GARMIN SYNC]   Files in directory: {all_files}", hypothesis_id="H5", data={"files": all_files})
+    # #endregion
+    
+    # Validate JSON content if files exist
+    if oauth1_exists and oauth2_exists:
+        oauth1_valid = False
+        oauth2_valid = False
+        try:
+            with open(oauth1_path, "r") as f:
+                oauth1_data = json.load(f)
+                oauth1_valid = isinstance(oauth1_data, dict) and len(oauth1_data) > 0
+                log_print(f"[GARMIN SYNC] oauth1_token.json is valid: {oauth1_valid}", hypothesis_id="H5", data={"oauth1_valid": oauth1_valid})
+        except Exception as e:
+            log_print(f"[GARMIN SYNC] [ERROR] oauth1_token.json is invalid JSON: {str(e)}", level="error", hypothesis_id="H5")
+        
+        try:
+            with open(oauth2_path, "r") as f:
+                oauth2_data = json.load(f)
+                oauth2_valid = isinstance(oauth2_data, dict) and len(oauth2_data) > 0
+                log_print(f"[GARMIN SYNC] oauth2_token.json is valid: {oauth2_valid}", hypothesis_id="H5", data={"oauth2_valid": oauth2_valid})
+        except Exception as e:
+            log_print(f"[GARMIN SYNC] [ERROR] oauth2_token.json is invalid JSON: {str(e)}", level="error", hypothesis_id="H5")
+        
+        if not (oauth1_valid and oauth2_valid):
+            log_print(f"[GARMIN SYNC] [ERROR] Token files exist but are invalid, will re-authenticate", level="error", hypothesis_id="H5")
+            oauth1_exists = False  # Force re-authentication
+            oauth2_exists = False
+    
+    if oauth1_exists and oauth2_exists:
+        try:
+            # #region agent log
+            log_print(f"[GARMIN SYNC] Attempting to restore existing session from {user_token_dir}", hypothesis_id="H5", data={"step": "try_resume", "token_dir": user_token_dir})
+            # #endregion
+            
+            # Clear any existing garth state before resuming
+            try:
+                # Try to logout/reset garth state if possible
+                if hasattr(garth, 'logout'):
+                    try:
+                        garth.logout()
+                    except:
+                        pass
+            except:
+                pass
+            
+            # Configure and resume
+            # IMPORTANT: garth uses a global client, so we need to ensure it's properly configured
+            # According to garth documentation, resume() should be called AFTER configure()
+            # and it will create the client if tokens exist
+            
+            # CRITICAL FIX: Follow the same pattern as garmin_health_service.py
+            # which successfully uses garth.resume() + garth.configure() + GarminConnectAPI()
+            # The key difference is the ORDER: resume() first, then configure()
+            
+            log_print(f"[GARMIN SYNC] Calling garth.resume() with path: {user_token_dir}", hypothesis_id="H5", data={"token_dir": user_token_dir, "step": "before_resume"})
+            
+            try:
+                # Resume session - this loads tokens from files
+                # Note: In some garth versions, resume() may not create client immediately
+                garth.resume(user_token_dir)
+                log_print(f"[GARMIN SYNC] garth.resume() completed", hypothesis_id="H5", data={"step": "resume_complete"})
+            except Exception as resume_error:
+                log_print(f"[GARMIN SYNC] [ERROR] garth.resume() raised exception: {str(resume_error)}", level="error", hypothesis_id="H5", data={"error": str(resume_error)})
+                raise
+            
+            # Configure AFTER resume (same pattern as garmin_health_service.py)
+            log_print(f"[GARMIN SYNC] Configuring garth after resume...", hypothesis_id="H5", data={"step": "configure_after_resume"})
+            garth.configure(domain="garmin.com", timeout=120)
+            
+            # Check if client exists - it should be created by now
+            client_after = getattr(garth, 'client', None)
+            log_print(f"[GARMIN SYNC] garth.client after resume+configure: {client_after is not None}", hypothesis_id="H5", data={"client_exists": client_after is not None})
+            
+            # If client still doesn't exist, this is a critical issue
+            # In this case, we'll proceed anyway and let GarminConnectAPI() handle it
+            # because GarminConnectAPI() might create the client internally
+            if not client_after:
+                log_print(f"[GARMIN SYNC] [WARNING] garth.client is None after resume+configure, but proceeding - GarminConnectAPI() may create it", level="warning", hypothesis_id="H5")
+            
+            # #region agent log
+            log_print(f"[GARMIN SYNC] garth.resume() completed", hypothesis_id="H5", data={"step": "resume_complete"})
+            # #endregion
+            
+            # Verify garth has valid OAuth state before creating API
+            try:
+                # Check if garth client has tokens
+                if hasattr(garth, 'client') and garth.client:
+                    has_oauth1 = hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token
+                    has_oauth2 = hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token
+                    log_print(f"[GARMIN SYNC] Garth client state: oauth1={has_oauth1}, oauth2={has_oauth2}", hypothesis_id="H5", data={"has_oauth1": has_oauth1, "has_oauth2": has_oauth2})
+                    
+                    if not (has_oauth1 and has_oauth2):
+                        raise Exception("Garth client does not have valid OAuth tokens after resume")
+            except AttributeError:
+                # garth.client might not have these attributes, continue anyway
+                log_print(f"[GARMIN SYNC] Could not verify garth client OAuth state (not critical)", hypothesis_id="H5")
+            
+            # Verify garth client state is preserved before creating API
+            try:
+                # Force garth to use the resumed session
+                if hasattr(garth, 'client') and garth.client:
+                    # Verify tokens are still there
+                    has_oauth1_after = hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token
+                    has_oauth2_after = hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token
+                    log_print(f"[GARMIN SYNC] Before API creation - oauth1={has_oauth1_after}, oauth2={has_oauth2_after}", hypothesis_id="H5", data={"has_oauth1": has_oauth1_after, "has_oauth2": has_oauth2_after})
+                    
+                    if not has_oauth1_after:
+                        log_print(f"[GARMIN SYNC] [ERROR] oauth1_token lost after resume!", level="error", hypothesis_id="H5")
+                        raise Exception("OAuth1 token not found in garth.client after resume")
+            except AttributeError:
+                log_print(f"[GARMIN SYNC] Could not verify garth client state before API creation", level="warning", hypothesis_id="H5")
+            
+            # CRITICAL: Verify garth.client has oauth1_token before creating API
+            # GarminConnectAPI() uses garth.client internally, so it must have tokens
+            try:
+                if hasattr(garth, 'client') and garth.client:
+                    # Check oauth1_token directly
+                    oauth1_token = getattr(garth.client, 'oauth1_token', None)
+                    oauth2_token = getattr(garth.client, 'oauth2_token', None)
+                    log_print(f"[GARMIN SYNC] Direct token check - oauth1_token exists: {oauth1_token is not None}, oauth2_token exists: {oauth2_token is not None}", hypothesis_id="H5", data={"has_oauth1": oauth1_token is not None, "has_oauth2": oauth2_token is not None})
+                    
+                    if oauth1_token is None:
+                        # Try to inspect what's in garth.client
+                        client_attrs = dir(garth.client)
+                        log_print(f"[GARMIN SYNC] [ERROR] oauth1_token is None! garth.client attributes: {[a for a in client_attrs if not a.startswith('_')]}", level="error", hypothesis_id="H5")
+                        raise Exception("OAuth1 token is None in garth.client after resume - cannot create API")
+            except Exception as e:
+                log_print(f"[GARMIN SYNC] [ERROR] Failed to verify tokens before API creation: {str(e)}", level="error", hypothesis_id="H5")
+                raise
+            
+            # Verify session is valid by making a test API call
+            log_print(f"[GARMIN SYNC] Creating GarminConnectAPI instance...", hypothesis_id="H5", data={"step": "create_api"})
+            api = GarminConnectAPI()
+            
+            # CRITICAL FIX: GarminConnectAPI() creates api.garth but NOT api.garth.client
+            # Also, api.garth.connectapi() uses api.garth.oauth1_token directly, not api.garth.client.oauth1_token
+            # We need to:
+            # 1. Assign garth.client to api.garth.client
+            # 2. Copy tokens to api.garth directly
+            log_print(f"[GARMIN SYNC] [FIX] Assigning garth.client to api.garth.client and copying tokens to api.garth...", hypothesis_id="H5", data={"step": "assign_client_fix"})
+            try:
+                if hasattr(garth, 'client') and garth.client:
+                    if hasattr(api, 'garth'):
+                        # Step 1: Assign the global garth.client to api.garth.client
+                        api.garth.client = garth.client
+                        log_print(f"[GARMIN SYNC] [FIX] Step 1: Assigned garth.client to api.garth.client", hypothesis_id="H5", data={"step": "assign_client"})
+                        
+                        # Step 2: Copy tokens directly to api.garth (because connectapi() uses api.garth.oauth1_token)
+                        # CRITICAL: This MUST be done because api.garth.connectapi() -> self.request() checks self.oauth1_token
+                        if hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token:
+                            api.garth.oauth1_token = garth.client.oauth1_token
+                            log_print(f"[GARMIN SYNC] [FIX] Step 2: Copied oauth1_token to api.garth", hypothesis_id="H5", data={"step": "copy_oauth1_to_garth"})
+                        if hasattr(garth.client, 'oauth1_token_secret') and garth.client.oauth1_token_secret:
+                            api.garth.oauth1_token_secret = garth.client.oauth1_token_secret
+                        if hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token:
+                            api.garth.oauth2_token = garth.client.oauth2_token
+                        
+                        # Verify both
+                        has_client_oauth1 = hasattr(api.garth, 'client') and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token is not None
+                        has_garth_oauth1 = hasattr(api.garth, 'oauth1_token') and api.garth.oauth1_token is not None
+                        log_print(f"[GARMIN SYNC] [FIX] Verification - api.garth.client.oauth1_token: {has_client_oauth1}, api.garth.oauth1_token: {has_garth_oauth1}", hypothesis_id="H5", data={"client_oauth1": has_client_oauth1, "garth_oauth1": has_garth_oauth1})
+                        
+                        if not has_garth_oauth1:
+                            log_print(f"[GARMIN SYNC] [ERROR] api.garth.oauth1_token is still None after copy! This will cause get_activities() to fail!", level="error", hypothesis_id="H5")
+                        
+                        if not has_garth_oauth1:
+                            log_print(f"[GARMIN SYNC] [ERROR] api.garth.oauth1_token is still None after copy!", level="error", hypothesis_id="H5")
+                    else:
+                        log_print(f"[GARMIN SYNC] [ERROR] api.garth doesn't exist", level="error", hypothesis_id="H5")
+                else:
+                    log_print(f"[GARMIN SYNC] [ERROR] garth.client doesn't exist to assign", level="error", hypothesis_id="H5")
+            except Exception as assign_error:
+                import traceback
+                log_print(f"[GARMIN SYNC] [ERROR] Failed to assign/copy tokens: {str(assign_error)}", level="error", hypothesis_id="H5", data={"error": str(assign_error), "traceback": traceback.format_exc()})
+            
+            # Verify garth state is still there after API creation - DETAILED DIAGNOSTIC
+            log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Verifying state after GarminConnectAPI() creation...", hypothesis_id="H5", data={"step": "after_api_creation_diagnostic"})
+            try:
+                global_client_exists = hasattr(garth, 'client') and garth.client is not None
+                global_oauth1_exists = global_client_exists and hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token is not None
+                global_oauth2_exists = global_client_exists and hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token is not None
+                global_client_id = id(garth.client) if global_client_exists else None
+                
+                log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Global garth.client state:", hypothesis_id="H5", data={
+                    "exists": global_client_exists,
+                    "has_oauth1": global_oauth1_exists,
+                    "has_oauth2": global_oauth2_exists,
+                    "client_id": global_client_id
+                })
+                
+                # Check api.garth.client
+                api_garth_exists = hasattr(api, 'garth')
+                api_client_exists = api_garth_exists and hasattr(api.garth, 'client') and api.garth.client is not None
+                api_oauth1_exists = api_client_exists and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token is not None
+                api_oauth2_exists = api_client_exists and hasattr(api.garth.client, 'oauth2_token') and api.garth.client.oauth2_token is not None
+                api_client_id = id(api.garth.client) if api_client_exists else None
+                
+                log_print(f"[GARMIN SYNC] [DIAGNOSTIC] api.garth.client state:", hypothesis_id="H5", data={
+                    "garth_exists": api_garth_exists,
+                    "client_exists": api_client_exists,
+                    "has_oauth1": api_oauth1_exists,
+                    "has_oauth2": api_oauth2_exists,
+                    "client_id": api_client_id
+                })
+                
+                # Check if they are the same object
+                if global_client_exists and api_client_exists:
+                    same_object = garth.client is api.garth.client
+                    log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Are garth.client and api.garth.client the same object? {same_object}", hypothesis_id="H5", data={
+                        "same_object": same_object,
+                        "global_id": global_client_id,
+                        "api_id": api_client_id
+                    })
+                    
+                    if not same_object:
+                        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] [WARNING] Different objects! GarminConnectAPI() created its own client", level="warning", hypothesis_id="H5")
+                    
+                    if global_oauth1_exists and not api_oauth1_exists:
+                        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] [WARNING] Global has oauth1_token but api.garth.client does not!", level="warning", hypothesis_id="H5")
+            except Exception as e:
+                import traceback
+                log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Error verifying state after API creation: {str(e)}", level="error", hypothesis_id="H5", data={"error": str(e), "traceback": traceback.format_exc()})
+            
+            log_print(f"[GARMIN SYNC] Testing API with get_full_name()...", hypothesis_id="H5", data={"step": "test_api"})
+            user_name = api.get_full_name()  # Test call
+            # #region agent log
+            log_print(f"[GARMIN SYNC] [OK] Session restored successfully for user: {user_name}", hypothesis_id="H5", data={"step": "restore_success", "user_name": user_name})
+            # #endregion
+            return api
+        except Exception as e:
+            import traceback
+            traceback_str = traceback.format_exc()
+            # #region agent log
+            log_print(f"[GARMIN SYNC] [ERROR] Failed to restore session: {str(e)}, will re-authenticate", level="error", hypothesis_id="H5", data={"step": "restore_failed", "error": str(e), "traceback": traceback_str})
+            # #endregion
+            
+            # Clean up garth state on failure
+            try:
+                if hasattr(garth, 'logout'):
+                    garth.logout()
+            except:
+                pass
+
+    # If restore failed or no tokens exist, do fresh login
+    log_print(f"[GARMIN SYNC] Performing fresh login...", hypothesis_id="H5", data={"step": "fresh_login"})
+    
+    # Decrypt credentials
+    try:
+        credentials_json = decrypt_token(user.garmin_token)
+        credentials = json.loads(credentials_json)
+        email = credentials["email"]
+        password = credentials["password"]
+        log_print(f"[GARMIN SYNC] Credentials decrypted for user: {email}", hypothesis_id="H5")
+    except Exception as e:
+        log_print(f"[GARMIN SYNC] [ERROR] Failed to decrypt credentials: {str(e)}", level="error", hypothesis_id="H5")
+        raise Exception(f"Failed to decrypt Garmin credentials: {str(e)}")
+
+    # Use garth directly to ensure session is saved correctly
+    log_print(f"[GARMIN SYNC] Logging in with garth...", hypothesis_id="H5", data={"step": "garth_login"})
+    garth.login(email, password)
+    garth.configure(domain="garmin.com", timeout=120)
+    log_print(f"[GARMIN SYNC] Login successful", hypothesis_id="H5", data={"step": "login_success"})
+
+    # Save OAuth tokens to persistent directory for Celery workers
+    # Use same path calculation as connect_user_garmin to ensure consistency
+    # Use __file__ to reliably get backend directory
+    service_file = os.path.abspath(__file__)
+    services_dir = os.path.dirname(service_file)
+    app_dir = os.path.dirname(services_dir)
+    backend_dir = os.path.dirname(app_dir)
+    if os.name == 'nt':  # Windows
+        persistent_dir = os.path.join(backend_dir, "garmin_tokens")
+    else:  # Linux/Docker
+        persistent_dir = "/app/garmin_tokens"
+    user_token_dir = os.path.join(persistent_dir, f"user_{user_id}")
+    os.makedirs(user_token_dir, exist_ok=True)
+    log_print(f"[GARMIN SYNC] Saving new tokens to: {user_token_dir}", hypothesis_id="H5", data={"step": "save_new_tokens", "token_dir": user_token_dir})
 
     # Save garth session directly to user's persistent directory
-    print(f"[GARMIN] Saving session to {user_token_dir}")
-    garth.save(user_token_dir)
+    log_print(f"[GARMIN SYNC] Saving session to {user_token_dir}", hypothesis_id="H5")
+    try:
+        garth.save(user_token_dir)
+        log_print(f"[GARMIN SYNC] garth.save() completed", hypothesis_id="H5", data={"step": "save_complete"})
+        
+        # Verify tokens were saved
+        oauth1_new = os.path.join(user_token_dir, "oauth1_token.json")
+        oauth2_new = os.path.join(user_token_dir, "oauth2_token.json")
+        if os.path.exists(oauth1_new) and os.path.exists(oauth2_new):
+            oauth1_size = os.path.getsize(oauth1_new)
+            oauth2_size = os.path.getsize(oauth2_new)
+            log_print(f"[GARMIN SYNC] New tokens saved: oauth1={oauth1_size} bytes, oauth2={oauth2_size} bytes", hypothesis_id="H5", data={"oauth1_size": oauth1_size, "oauth2_size": oauth2_size})
+        else:
+            log_print(f"[GARMIN SYNC] [WARNING] Token files not found after save", level="warning", hypothesis_id="H5")
+    except Exception as e:
+        log_print(f"[GARMIN SYNC] [ERROR] Failed to save tokens: {str(e)}", level="error", hypothesis_id="H5")
+        raise Exception(f"Failed to save OAuth tokens after fresh login: {str(e)}")
 
     # Remove email/password files for security (keep only OAuth tokens)
     import shutil
@@ -199,15 +703,27 @@ def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
         if filename not in allowed_files:
             file_path = os.path.join(user_token_dir, filename)
             os.remove(file_path)
-            print(f"[GARMIN] Removed {filename} for security")
+            log_print(f"[GARMIN SYNC] Removed {filename} for security")
         else:
             # Verify file has content
             file_path = os.path.join(user_token_dir, filename)
             size = os.path.getsize(file_path)
-            print(f"[GARMIN] Kept {filename} ({size} bytes)")
+            log_print(f"[GARMIN SYNC] Kept {filename} ({size} bytes)")
 
     # Now create GarminConnectAPI using the authenticated garth session
     api = GarminConnectAPI()
+    
+    # CRITICAL FIX: Assign garth.client to api.garth.client AND copy tokens to api.garth
+    if hasattr(garth, 'client') and garth.client and hasattr(api, 'garth'):
+        api.garth.client = garth.client
+        # Also copy tokens to api.garth directly (connectapi() uses api.garth.oauth1_token)
+        if hasattr(garth.client, 'oauth1_token'):
+            api.garth.oauth1_token = garth.client.oauth1_token
+        if hasattr(garth.client, 'oauth1_token_secret'):
+            api.garth.oauth1_token_secret = garth.client.oauth1_token_secret
+        if hasattr(garth.client, 'oauth2_token'):
+            api.garth.oauth2_token = garth.client.oauth2_token
+        log_print(f"[GARMIN SYNC] [FIX] Assigned garth.client to api.garth.client and copied tokens to api.garth (fresh login)", hypothesis_id="H5")
 
     return api
 
@@ -570,6 +1086,7 @@ def sync_user_activities(
     Returns:
         List of created Workout models
     """
+    log_print(f"[GARMIN SYNC] Starting sync_user_activities for user {user_id}")
     logger.info(
         "Starting Garmin sync",
         extra={"user_id": user_id, "start_date": str(start_date), "end_date": str(end_date)}
@@ -578,14 +1095,108 @@ def sync_user_activities(
     # Get user to check if first sync
     user = crud.get_user_by_id(db, user_id)
     is_first_sync = user.last_garmin_sync is None
+    log_print(f"[GARMIN SYNC] First sync: {is_first_sync}")
 
     # Get Garmin API
     logger.debug("Calling get_user_garmin_api", extra={"user_id": user_id})
-    api = get_user_garmin_api(db, user_id)
-    logger.debug("Garmin API obtained successfully", extra={"user_id": user_id})
+    log_print(f"[GARMIN SYNC] Calling get_user_garmin_api...")
+    try:
+        api = get_user_garmin_api(db, user_id)
+        log_print(f"[GARMIN SYNC] [OK] Garmin API obtained successfully")
+        logger.debug("Garmin API obtained successfully", extra={"user_id": user_id})
+    except Exception as e:
+        log_print(f"[GARMIN SYNC] [ERROR] Failed to get Garmin API: {str(e)}")
+        import traceback
+        log_print(f"[GARMIN SYNC] Traceback:\n{traceback.format_exc()}")
+        raise
 
+    # #region agent log
+    # Verify garth state BEFORE sync_user_zones_and_profile - DETAILED DIAGNOSTIC
+    log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Verifying state BEFORE sync_user_zones_and_profile...", hypothesis_id="H5", data={"step": "before_sync_profile_diagnostic"})
+    try:
+        global_client_before = hasattr(garth, 'client') and garth.client is not None
+        global_oauth1_before = global_client_before and hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token is not None
+        global_oauth2_before = global_client_before and hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token is not None
+        global_client_id_before = id(garth.client) if global_client_before else None
+        
+        api_garth_exists_before = hasattr(api, 'garth')
+        api_client_before = api_garth_exists_before and hasattr(api.garth, 'client') and api.garth.client is not None
+        api_oauth1_before = api_client_before and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token is not None
+        api_oauth2_before = api_client_before and hasattr(api.garth.client, 'oauth2_token') and api.garth.client.oauth2_token is not None
+        api_client_id_before = id(api.garth.client) if api_client_before else None
+        
+        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] BEFORE sync_user_zones_and_profile:", hypothesis_id="H5", data={
+            "global_client": global_client_before,
+            "global_oauth1": global_oauth1_before,
+            "global_oauth2": global_oauth2_before,
+            "global_client_id": global_client_id_before,
+            "api_client": api_client_before,
+            "api_oauth1": api_oauth1_before,
+            "api_oauth2": api_oauth2_before,
+            "api_client_id": api_client_id_before,
+            "same_object": global_client_id_before == api_client_id_before if (global_client_before and api_client_before) else False
+        })
+    except Exception as e:
+        import traceback
+        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Error checking state before sync_user_zones_and_profile: {str(e)}", level="error", hypothesis_id="H5", data={"error": str(e), "traceback": traceback.format_exc()})
+    # #endregion
+    
     # Sync user profile, zones, and settings
-    sync_user_zones_and_profile(db, user_id, api)
+    # #region agent log
+    log_print(f"[GARMIN SYNC] Calling sync_user_zones_and_profile...", hypothesis_id="H5", data={"step": "before_sync_profile"})
+    # #endregion
+    try:
+        sync_user_zones_and_profile(db, user_id, api)
+        # #region agent log
+        log_print(f"[GARMIN SYNC] sync_user_zones_and_profile completed", hypothesis_id="H5", data={"step": "after_sync_profile"})
+        # #endregion
+    except Exception as e:
+        # #region agent log
+        log_print(f"[GARMIN SYNC] [ERROR] sync_user_zones_and_profile failed: {str(e)}", level="error", hypothesis_id="H5", data={"error": str(e)})
+        # #endregion
+        raise
+    
+    # #region agent log
+    # Verify garth state AFTER sync_user_zones_and_profile - DETAILED DIAGNOSTIC
+    log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Verifying state AFTER sync_user_zones_and_profile...", hypothesis_id="H5", data={"step": "after_sync_profile_diagnostic"})
+    try:
+        global_client_after = hasattr(garth, 'client') and garth.client is not None
+        global_oauth1_after = global_client_after and hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token is not None
+        global_oauth2_after = global_client_after and hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token is not None
+        global_client_id_after = id(garth.client) if global_client_after else None
+        
+        api_garth_exists_after = hasattr(api, 'garth')
+        api_client_after = api_garth_exists_after and hasattr(api.garth, 'client') and api.garth.client is not None
+        api_oauth1_after = api_client_after and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token is not None
+        api_oauth2_after = api_client_after and hasattr(api.garth.client, 'oauth2_token') and api.garth.client.oauth2_token is not None
+        api_client_id_after = id(api.garth.client) if api_client_after else None
+        
+        # Check if state changed
+        state_changed = False
+        if global_client_before and global_client_after:
+            state_changed = (global_client_id_before != global_client_id_after) or \
+                          (global_oauth1_before != global_oauth1_after) or \
+                          (api_oauth1_before != api_oauth1_after)
+        
+        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] AFTER sync_user_zones_and_profile:", hypothesis_id="H5", data={
+            "global_client": global_client_after,
+            "global_oauth1": global_oauth1_after,
+            "global_oauth2": global_oauth2_after,
+            "global_client_id": global_client_id_after,
+            "api_client": api_client_after,
+            "api_oauth1": api_oauth1_after,
+            "api_oauth2": api_oauth2_after,
+            "api_client_id": api_client_id_after,
+            "same_object": global_client_id_after == api_client_id_after if (global_client_after and api_client_after) else False,
+            "state_changed": state_changed
+        })
+        
+        if state_changed:
+            log_print(f"[GARMIN SYNC] [DIAGNOSTIC] [WARNING] State changed after sync_user_zones_and_profile()!", level="warning", hypothesis_id="H5")
+    except Exception as e:
+        import traceback
+        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Error checking state after sync_user_zones_and_profile: {str(e)}", level="error", hypothesis_id="H5", data={"error": str(e), "traceback": traceback.format_exc()})
+    # #endregion
 
     # Default date range
     if not end_date:
@@ -603,9 +1214,120 @@ def sync_user_activities(
                 start_date = end_date - timedelta(days=30)
             logger.info(f"Incremental sync from {start_date}", extra={"user_id": user_id, "start_date": str(start_date)})
 
+    # #region agent log
+    # CRITICAL FIX: Ensure api.garth.client has tokens before get_activities()
+    # The issue is that api.garth.client might be a different object or not have tokens
+    # We need to sync tokens from global garth.client to api.garth.client
+    log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Starting token verification before get_activities()...", hypothesis_id="H2", data={"step": "start_verification"})
+    try:
+        log_print(f"[GARMIN SYNC] [DIAGNOSTIC] Inside try block, checking garth state...", hypothesis_id="H2", data={"step": "inside_try"})
+        global_client_before = hasattr(garth, 'client') and garth.client
+        global_oauth1_before = global_client_before and hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token
+        api_garth_exists = hasattr(api, 'garth')
+        api_client_before = api_garth_exists and hasattr(api.garth, 'client') and api.garth.client
+        api_oauth1_before = api_client_before and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token
+        
+        log_print(f"[GARMIN SYNC] BEFORE get_activities() - global garth.client exists: {global_client_before}, has oauth1: {global_oauth1_before}, api.garth.client exists: {api_client_before}, has oauth1: {api_oauth1_before}", hypothesis_id="H2", data={"global_client": global_client_before, "global_oauth1": global_oauth1_before, "api_client": api_client_before, "api_oauth1": api_oauth1_before})
+        
+        # CRITICAL FIX: If api.garth.client doesn't have oauth1_token but global does, copy tokens
+        if global_oauth1_before and api_client_before and not api_oauth1_before:
+            log_print(f"[GARMIN SYNC] [FIX] api.garth.client missing oauth1_token, copying from global garth.client...", hypothesis_id="H2", data={"step": "copy_tokens"})
+            try:
+                # Copy oauth1 tokens
+                if hasattr(garth.client, 'oauth1_token'):
+                    api.garth.client.oauth1_token = garth.client.oauth1_token
+                if hasattr(garth.client, 'oauth1_token_secret'):
+                    api.garth.client.oauth1_token_secret = garth.client.oauth1_token_secret
+                # Copy oauth2 tokens
+                if hasattr(garth.client, 'oauth2_token'):
+                    api.garth.client.oauth2_token = garth.client.oauth2_token
+                if hasattr(garth.client, 'oauth2_token_secret'):
+                    api.garth.client.oauth2_token_secret = getattr(garth.client, 'oauth2_token_secret', None)
+                
+                # Verify tokens were copied
+                api_oauth1_after_copy = hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token
+                log_print(f"[GARMIN SYNC] [FIX] Tokens copied, api.garth.client.oauth1_token exists: {api_oauth1_after_copy}", hypothesis_id="H2", data={"api_oauth1_after_copy": api_oauth1_after_copy})
+            except Exception as copy_error:
+                log_print(f"[GARMIN SYNC] [ERROR] Failed to copy tokens: {str(copy_error)}", level="error", hypothesis_id="H2")
+        elif not api_client_before and global_client_before:
+            # If api.garth.client doesn't exist, try to assign global client
+            log_print(f"[GARMIN SYNC] [FIX] api.garth.client doesn't exist, assigning global garth.client...", hypothesis_id="H2", data={"step": "assign_client"})
+            try:
+                if hasattr(api, 'garth'):
+                    api.garth.client = garth.client
+                    # Also copy tokens to api.garth directly
+                    if hasattr(garth.client, 'oauth1_token'):
+                        api.garth.oauth1_token = garth.client.oauth1_token
+                    if hasattr(garth.client, 'oauth1_token_secret'):
+                        api.garth.oauth1_token_secret = garth.client.oauth1_token_secret
+                    if hasattr(garth.client, 'oauth2_token'):
+                        api.garth.oauth2_token = garth.client.oauth2_token
+                    log_print(f"[GARMIN SYNC] [FIX] Assigned global garth.client to api.garth.client and copied tokens to api.garth", hypothesis_id="H2")
+            except Exception as assign_error:
+                log_print(f"[GARMIN SYNC] [ERROR] Failed to assign client: {str(assign_error)}", level="error", hypothesis_id="H2")
+        
+        # Check if api.garth.client is the same object as garth.client
+        if global_client_before and api_client_before:
+            same_client = garth.client is api.garth.client
+            log_print(f"[GARMIN SYNC] garth.client and api.garth.client are same object: {same_client}", hypothesis_id="H3", data={"same_client": same_client})
+        
+        # CRITICAL FIX: api.garth.connectapi() uses api.garth.oauth1_token directly, not api.garth.client.oauth1_token
+        # The traceback shows: self.garth.connectapi() -> self.request() -> assert self.oauth1_token
+        # So we need to copy tokens to api.garth itself ALWAYS, regardless of current state
+        if api_garth_exists and global_oauth1_before:
+            log_print(f"[GARMIN SYNC] [FIX] Ensuring api.garth has oauth1_token (connectapi() uses api.garth.oauth1_token directly)...", hypothesis_id="H2", data={"step": "copy_to_garth_direct"})
+            try:
+                # ALWAYS copy tokens to api.garth directly (even if they seem to exist)
+                # This ensures api.garth.oauth1_token is set for connectapi() calls
+                if hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token:
+                    api.garth.oauth1_token = garth.client.oauth1_token
+                    log_print(f"[GARMIN SYNC] [FIX] Copied oauth1_token to api.garth", hypothesis_id="H2")
+                if hasattr(garth.client, 'oauth1_token_secret') and garth.client.oauth1_token_secret:
+                    api.garth.oauth1_token_secret = garth.client.oauth1_token_secret
+                if hasattr(garth.client, 'oauth2_token') and garth.client.oauth2_token:
+                    api.garth.oauth2_token = garth.client.oauth2_token
+                
+                # Verify
+                api_garth_oauth1_after = hasattr(api.garth, 'oauth1_token') and api.garth.oauth1_token is not None
+                log_print(f"[GARMIN SYNC] [FIX] Verification - api.garth.oauth1_token exists: {api_garth_oauth1_after}", hypothesis_id="H2", data={"api_garth_oauth1": api_garth_oauth1_after})
+                
+                if not api_garth_oauth1_after:
+                    log_print(f"[GARMIN SYNC] [ERROR] Failed to set api.garth.oauth1_token!", level="error", hypothesis_id="H2")
+            except Exception as copy_error:
+                import traceback
+                log_print(f"[GARMIN SYNC] [ERROR] Failed to copy tokens to api.garth: {str(copy_error)}", level="error", hypothesis_id="H2", data={"error": str(copy_error), "traceback": traceback.format_exc()})
+    except Exception as e:
+        import traceback
+        log_print(f"[GARMIN SYNC] Error checking/fixing state before get_activities(): {str(e)}", level="error", hypothesis_id="H2", data={"error": str(e), "traceback": traceback.format_exc()})
+    # #endregion
+
     # Fetch activities with high limit to get all activities
     # Note: get_activities() is more reliable than get_activities_by_date() which has internal limits
-    activities = api.get_activities(start=0, limit=1000)
+    # #region agent log
+    log_print(f"[GARMIN SYNC] Calling api.get_activities(start=0, limit=1000)...", hypothesis_id="H2", data={"step": "before_get_activities"})
+    # #endregion
+    try:
+        activities = api.get_activities(start=0, limit=1000)
+        # #region agent log
+        log_print(f"[GARMIN SYNC] [OK] api.get_activities() succeeded, got {len(activities)} activities", hypothesis_id="H2", data={"activity_count": len(activities)})
+        # #endregion
+    except Exception as e:
+        import traceback
+        traceback_str = traceback.format_exc()
+        # #region agent log
+        log_print(f"[GARMIN SYNC] [ERROR] api.get_activities() failed: {str(e)}", level="error", hypothesis_id="H2", data={"error": str(e), "error_type": type(e).__name__, "traceback": traceback_str})
+        
+        # Check state AFTER error
+        try:
+            global_client_after = hasattr(garth, 'client') and garth.client
+            global_oauth1_after = global_client_after and hasattr(garth.client, 'oauth1_token') and garth.client.oauth1_token
+            api_client_after = hasattr(api, 'garth') and hasattr(api.garth, 'client') and api.garth.client
+            api_oauth1_after = api_client_after and hasattr(api.garth.client, 'oauth1_token') and api.garth.client.oauth1_token
+            log_print(f"[GARMIN SYNC] AFTER get_activities() ERROR - global garth.client exists: {global_client_after}, has oauth1: {global_oauth1_after}, api.garth.client exists: {api_client_after}, has oauth1: {api_oauth1_after}", hypothesis_id="H2", data={"global_client": global_client_after, "global_oauth1": global_oauth1_after, "api_client": api_client_after, "api_oauth1": api_oauth1_after})
+        except:
+            pass
+        # #endregion
+        raise
 
     # Filter by date range
     activities = [

@@ -44,7 +44,7 @@ export interface AuthResponse {
 // ============================================================================
 
 export type RunningLevel = 'beginner' | 'intermediate' | 'advanced' | 'elite';
-export type CoachingStyle = 'motivational' | 'analytical' | 'balanced';
+export type CoachingStyle = 'motivator' | 'technical' | 'balanced' | 'custom';
 export type GoalType = 'race' | 'distance' | 'time' | 'consistency';
 
 export interface Goal {
@@ -67,6 +67,7 @@ export interface AthletePreferences {
   available_hours_per_week?: number;
   preferred_workout_time?: 'morning' | 'afternoon' | 'evening';
   equipment?: string[];
+  custom_prompt?: string; // Custom coach prompt (max 1000 chars)
 }
 
 export interface AthleteProfile {

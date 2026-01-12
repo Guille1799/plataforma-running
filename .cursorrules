@@ -1,512 +1,111 @@
-# 🎯 RunCoach AI - Instrucciones de Desarrollo
-
-## Filosofía de Trabajo
-
-**Objetivo:** Excelencia y robustez máxima. Proyecto productivo perfecto.
-
-### Principios Fundamentales
-
-1. **Código de Producción**
-   - Todo código debe estar listo para producción
-   - No dejar TODOs sin resolver
-   - Manejo de errores exhaustivo
-   - Validación de datos en todas las capas
-   - Logging apropiado para debugging
-
-2. **Documentación**
-   - Documentación siempre actualizada con el código
-   - Versiones exactas en toda la documentación
-   - Ejemplos de código funcionales y probados
-   - Comentarios claros en código complejo
-
-3. **Arquitectura**
-   - Separación clara de responsabilidades
-   - Código reutilizable y modular
-   - Type safety estricto (TypeScript)
-   - Validación de esquemas (Pydantic/Zod)
-
-4. **Testing**
-   - Tests para funcionalidades críticas
-   - Validación manual antes de marcar como completo
-   - Edge cases considerados
-
-5. **Seguridad**
-   - Nunca exponer secrets en código
-   - Validación de inputs en backend
-   - Sanitización de datos de usuario
-   - Autenticación JWT correctamente implementada
-
-## 🎓 Metodología de Explicación
-
-**CRÍTICO:** Siempre explicar qué se ha hecho y por qué, con DOS niveles:
-
-### 1. Explicación Técnica
-- Para desarrolladores con experiencia
-- Detalles de implementación
-- Decisiones técnicas y alternativas consideradas
-- Impacto en arquitectura y rendimiento
-
-### 2. Explicación para Dummies
-- Lenguaje simple y claro
-- Analogías cuando sea útil
-- Sin jerga técnica innecesaria
-- Enfocado en "qué hace" y "por qué importa"
-
-### 3. Confirmación antes de Continuar
-- **NO pasar al siguiente paso hasta recibir OK explícito**
-- Esperar confirmación de que se entendió
-- Aclarar dudas antes de continuar
-- Verificar que el usuario está listo para el siguiente cambio
-
-### Ejemplo de Explicación Dual:
-
-**Técnico:**
-"Implementé un interceptor de Axios que maneja refresh tokens automáticamente. Cuando detecta un 401, intercepta la respuesta, llama al endpoint `/auth/refresh` con el refresh token almacenado, actualiza el access token en memoria y localStorage, y reintenta la petición original. Esto mejora la UX al evitar que el usuario tenga que hacer login manualmente cuando expira el token."
-
-**Para Dummies:**
-"Cuando tu sesión expira (como cuando te desconectas de Netflix), en lugar de pedirte que vuelvas a iniciar sesión manualmente, el sistema automáticamente renueva tu sesión en segundo plano y continúa con lo que estabas haciendo. Es como tener un asistente que renueva tu pase sin que te des cuenta."
-
-## 🔄 Flujo de Trabajo OBLIGATORIO
-
-**⚠️ CRÍTICO: Este flujo debe seguirse estrictamente. Si el usuario se sale de este flujo, emitir un WARNING explícito.**
-
-### Modo ASK (Preguntas y Consultas)
-**USO EXCLUSIVO:**
-- ✅ Preguntas sobre el código existente
-- ✅ Explicaciones de cómo funciona algo
-- ✅ Análisis y revisión de código (sin cambios)
-- ✅ Consultas de documentación
-- ✅ Sugerencias y recomendaciones
-- ✅ Entender el contexto antes de planificar
-
-**NO USAR para:**
-- ❌ Hacer cambios en código
-- ❌ Crear archivos nuevos
-- ❌ Ejecutar comandos
-- ❌ Planificar features grandes
-
-**EJEMPLOS CORRECTOS:**
-```
-✅ "¿Cómo funciona la autenticación JWT en este proyecto?"
-✅ "Revisa este componente y dime si hay problemas"
-✅ "Explícame el flujo de sincronización de Garmin"
-✅ "¿Qué mejoras necesita esta función?"
-✅ "Analiza este código y sugiere optimizaciones"
-```
-
-### Modo PLAN (Planificación)
-**USO EXCLUSIVO:**
-- ✅ Crear planes detallados para features grandes
-- ✅ Planificar refactorizaciones complejas
-- ✅ Diseñar arquitectura de nuevas funcionalidades
-- ✅ Dividir tareas en pasos ejecutables
-- ✅ Planificar migraciones o cambios estructurales
-
-**NO USAR para:**
-- ❌ Hacer preguntas simples
-- ❌ Ejecutar código o cambios
-- ❌ Implementar directamente
-
-**EJEMPLOS CORRECTOS:**
-```
-✅ "Planifica la implementación de notificaciones push"
-✅ "Crea un plan para refactorizar el sistema de autenticación"
-✅ "Planifica la optimización de queries en la base de datos"
-✅ "Diseña un plan para migrar a TypeScript estricto"
-```
-
-**PROCESO:**
-1. Analizar el código actual y contexto
-2. Crear plan paso a paso detallado
-3. Explicar cada paso (técnico + simple)
-4. Esperar aprobación del plan
-5. **NO ejecutar el plan** - eso es trabajo de AGENT
-
-### Modo AGENT (Ejecución de Código y Cambios)
-**USO EXCLUSIVO:**
-- ✅ Implementar código según un plan aprobado
-- ✅ Crear/editar/eliminar archivos
-- ✅ Refactorizar código existente
-- ✅ Ejecutar comandos (git, npm, pip, etc.)
-- ✅ Aplicar fixes y correcciones
-- ✅ Implementar features completas
-
-**NO USAR para:**
-- ❌ Hacer preguntas
-- ❌ Solo planificar sin implementar
-- ❌ Consultas sin cambios
-
-**EJEMPLOS CORRECTOS:**
-```
-✅ "Implementa el endpoint POST /api/v1/workouts según el plan aprobado"
-✅ "Crea el componente WorkoutCard con las especificaciones dadas"
-✅ "Refactoriza el servicio de autenticación según el plan paso 2"
-✅ "Aplica el fix para el bug de sincronización de Garmin"
-✅ "Crea los tests unitarios para el módulo de entrenamientos"
-```
-
-**REQUISITO:**
-- AGENT solo debe ejecutar cuando hay un plan aprobado o instrucciones claras
-- Si no hay plan, sugerir usar PLAN primero
-
-### ⚠️ SISTEMA DE WARNINGS
-
-**Si el usuario intenta usar un modo incorrecto, emitir este warning:**
-
-```
-⚠️ WARNING: Flujo de trabajo incorrecto detectado
-
-Estás en modo [MODO_ACTUAL] pero estás intentando [ACCIÓN_INCORRECTA].
-
-Flujo correcto:
-1. ASK → Para preguntas y consultas
-2. PLAN → Para planificar features/cambios grandes
-3. AGENT → Para ejecutar código y cambios
-
-Acción sugerida:
-[EXPLICAR QUÉ MODO USAR Y POR QUÉ]
-```
-
-**EJEMPLOS DE WARNINGS:**
-
-Si en ASK piden crear código:
-```
-⚠️ WARNING: Estás en modo ASK (solo consultas) pero intentas crear código.
-
-Para crear código, debes:
-1. Usar ASK primero: "¿Cómo debería implementarse X?" o "Planifica Y"
-2. Luego cambiar a PLAN: "Crea un plan detallado para implementar X"
-3. Finalmente usar AGENT: "Implementa el plan paso 1"
-
-¿Quieres que cambie a modo PLAN primero?
-```
-
-Si en PLAN intentan ejecutar directamente:
-```
-⚠️ WARNING: Estás en modo PLAN (solo planificación) pero intentas ejecutar código.
-
-El flujo correcto es:
-1. PLAN → Crear y aprobar el plan (✓ Ya hecho)
-2. AGENT → Ejecutar el plan implementando el código
-
-¿Quieres cambiar a modo AGENT para ejecutar el plan?
-```
-
-Si en AGENT piden solo preguntas:
-```
-⚠️ WARNING: Estás en modo AGENT (para ejecutar código) pero solo haces una pregunta.
-
-Para preguntas y consultas, usa modo ASK.
-
-Para mantener el contexto, puedo:
-- Responder aquí, pero para futuras consultas usa ASK
-- O cambiar a modo ASK para esta pregunta
-
-¿Cómo prefieres proceder?
-```
-
-## Stack Tecnológico (Versiones Exactas)
-
-### Frontend
-- **Next.js:** 16.0.3
-- **React:** 19.2.0
-- **TypeScript:** 5.x
-- **Tailwind CSS:** 4.x
-- **React Query:** 5.90.8
-- **Zustand:** 5.0.8
-- **Zod:** 4.1.12
-- **Recharts:** 3.4.1
-
-### Backend
-- **Python:** 3.11+
-- **FastAPI:** 0.121.1
-- **SQLAlchemy:** 2.0.44
-- **Pydantic:** 2.12.4
-- **Celery:** 5.4.0
-- **PostgreSQL:** 15
-- **Redis:** 7
-
-## Estructura del Proyecto
-
-```
-plataforma-running/
-├── app/                    # Frontend Next.js (App Router)
-│   ├── (auth)/            # Rutas de autenticación
-│   ├── (dashboard)/       # Rutas protegidas del dashboard
-│   └── components/        # Componentes React
-├── backend/               # API FastAPI
-│   ├── app/
-│   │   ├── routers/       # Endpoints API
-│   │   ├── services/      # Lógica de negocio
-│   │   ├── models.py      # Modelos SQLAlchemy
-│   │   └── schemas.py     # Validación Pydantic
-│   └── tests/             # Tests del backend
-├── components/            # Componentes compartidos
-├── lib/                   # Utilidades y helpers
-├── hooks/                 # React hooks personalizados
-├── docs/                  # Documentación actualizada
-│   ├── ARCHITECTURE.md
-│   ├── DEVELOPMENT.md
-│   ├── API.md
-│   └── DEPLOYMENT.md
-└── GUIAS_Y_EXPLICACIONES/ # Guías principales
-```
-
-## Convenciones de Código
-
-### TypeScript/React
-- Usar `interface` para tipos de objetos
-- Componentes funcionales con TypeScript
-- Props tipadas explícitamente
-- Manejo de errores con try/catch y estados de error
-- Loading states siempre presentes
-
-### Python/FastAPI
-- Type hints en todas las funciones
-- Docstrings en funciones públicas
-- Validación con Pydantic schemas
-- Manejo de excepciones específicas
-- Logging estructurado
-
-### Nombres
-- Variables: camelCase (TS) / snake_case (Python)
-- Componentes: PascalCase
-- Archivos: kebab-case para componentes, camelCase para utilidades
-- Constantes: UPPER_SNAKE_CASE
-
-## Flujo de Trabajo Estándar
-
-### Para Features Nuevas:
-```
-1. ASK → "¿Cómo funciona X actualmente?" (entender contexto)
-2. ASK → "¿Qué necesitamos para implementar Y?" (requisitos)
-3. PLAN → "Crea un plan detallado para implementar Y"
-4. Revisar y aprobar plan
-5. AGENT → "Implementa el plan paso 1"
-6. Revisar código generado
-7. AGENT → "Continúa con el paso 2" (repetir hasta completar)
-8. ASK → "Revisa el código final y sugiere mejoras"
-```
-
-### Para Bugs:
-```
-1. ASK → "Investiga este error: [descripción]"
-2. ASK → "¿Cuál es la causa raíz y cómo se soluciona?"
-3. PLAN → "Crea un plan para arreglar el bug"
-4. AGENT → "Implementa la solución según el plan"
-5. ASK → "Verifica que la solución es correcta"
-```
-
-### Para Refactorizaciones:
-```
-1. ASK → "Analiza este código y sugiere mejoras"
-2. PLAN → "Crea un plan de refactorización"
-3. AGENT → "Ejecuta el plan de refactorización"
-4. ASK → "Revisa el código refactorizado"
-```
-
-## Documentación
-
-- **Siempre actualizar** cuando cambies código
-- **Versiones exactas** en toda la documentación
-- **Ejemplos funcionales** que se puedan copiar y pegar
-- **Diagramas ASCII** para arquitectura cuando sea útil
-
-## Errores Comunes a Evitar
-
-1. ❌ Dejar versiones incorrectas en documentación
-2. ❌ Código sin manejo de errores
-3. ❌ TODOs sin resolver
-4. ❌ Validación solo en frontend
-5. ❌ Secrets hardcodeados
-6. ❌ Código comentado sin explicación
-7. ❌ Funciones sin type hints/types
-8. ❌ Continuar sin confirmación del usuario
-9. ❌ **Usar modo incorrecto para la tarea**
-10. ❌ **Intentar ejecutar código en modo ASK o PLAN**
-
-## Checklist de Calidad
-
-Antes de marcar algo como completo:
-
-- [ ] Código funciona correctamente
-- [ ] Manejo de errores implementado
-- [ ] Validación de datos presente
-- [ ] Type safety completo
-- [ ] Documentación actualizada
-- [ ] Versiones correctas en docs
-- [ ] Sin TODOs pendientes
-- [ ] Edge cases considerados
-- [ ] Logging apropiado
-- [ ] Código limpio y legible
-- [ ] Explicación técnica proporcionada
-- [ ] Explicación simple proporcionada
-- [ ] Confirmación del usuario recibida
-- [ ] **Flujo de trabajo correcto seguido (ASK → PLAN → AGENT)**
-- [ ] **Coordinación con otros agents verificada (si aplica)**
-
-## 🤝 COORDINACIÓN MÚLTIPLE DE AGENTS
-
-**⚠️ CRÍTICO: Si hay múltiples agents trabajando simultáneamente, SIEMPRE seguir este protocolo.**
-
-### Sistema de Coordinación Permanente
-
-**⚠️ LECTURA OBLIGATORIA:**
-1. **SIEMPRE leer `scripts/agent-coordination.md`** antes de trabajar con múltiples agents
-2. Este archivo contiene la guía completa y ejemplos detallados
-3. Consultarlo para dividir tareas, entender protocolos y resolver dudas
-
-**Archivos del Sistema:**
-- `.agent-lock.json` - Estado compartido de locks y tareas (leer ANTES de cada edición)
-- `scripts/agent-coordination.md` - Guía detallada de uso (leer AL INICIO del trabajo conjunto)
-
-**Este sistema es PERMANENTE y funciona para:**
-- ✅ Cualquier plan (no solo el plan actual)
-- ✅ Cualquier tarea (refactoring, features, bugs, etc.)
-- ✅ Cualquier número de agents (2, 3, 4+)
-- ✅ Trabajo simultáneo permanente
-
-### Protocolo OBLIGATORIO Antes de Editar Archivos
-
-**PASO 0: Leer Documentación (SIEMPRE)**
-1. Leer `scripts/agent-coordination.md` para entender el protocolo completo
-2. Leer `.agent-lock.json` para verificar estado actual de otros agents
-3. Identificar tu agent ID (agent-1, agent-2, etc.) según el contexto
-
-**PASO 1: Verificar Locks (SIEMPRE)**
-1. Leer `.agent-lock.json` antes de editar CUALQUIER archivo
-2. Verificar que el archivo NO esté en `files_being_edited` de otro agent
-3. Si está siendo editado, ESPERAR o elegir otro archivo/tarea
-4. Consultar `scripts/agent-coordination.md` si hay dudas sobre división de trabajo
-
-**PASO 2: Reservar Archivo (SIEMPRE)**
-1. Agregar el archivo a TU `files_being_edited` en `.agent-lock.json`
-2. Actualizar `last_update` con timestamp actual (formato ISO: `YYYY-MM-DDTHH:MM:SSZ`)
-3. Guardar el archivo INMEDIATAMENTE
-4. Si otro agent está editando el mismo archivo, DETENER y elegir otro archivo
-
-**PASO 3: Editar Archivo**
-1. Realizar los cambios normalmente
-2. Verificar que funciona (lint, tests si aplica)
-
-**PASO 4: Liberar Lock (SIEMPRE)**
-1. Remover el archivo de TU `files_being_edited`
-2. Agregar a `tasks_completed` si la tarea está completa
-3. Actualizar `last_update` con timestamp actual
-4. Guardar el archivo INMEDIATAMENTE
-
-### División de Trabajo Recomendada
-
-**Cuando trabajan múltiples agents, dividir por:**
-- **Módulos/Archivos:** Agent 1 edita routers, Agent 2 edita services
-- **Tareas independientes:** Agent 1 hace refactoring, Agent 2 resuelve bugs
-- **Áreas funcionales:** Agent 1 frontend, Agent 2 backend
-
-**NUNCA trabajar simultáneamente en:**
-- El mismo archivo
-- Archivos que dependen directamente (ej: router y su dependency)
-- Mismos modelos/base de datos (sin coordinación explícita)
-
-### Comunicación entre Agents
-
-**❌ NO es posible comunicarse directamente entre agents** (cada agent ejecuta en su propio contexto aislado).
-
-**✅ SOLUCIÓN: Sistema de Locks (`.agent-lock.json`)**
-- Estado compartido actualizado en tiempo real
-- Todos los agents leen/escriben el mismo archivo
-- Previene conflictos automáticamente
-
-**Formato del Lock:**
-```json
-{
-  "agents": {
-    "agent-1": {
-      "status": "active",
-      "current_task": "Descripción de tarea",
-      "files_being_edited": ["ruta/archivo1.py", "ruta/archivo2.ts"],
-      "tasks_completed": ["task-id-1", "task-id-2"],
-      "tasks_in_progress": ["task-id-3"]
-    }
-  },
-  "last_update": "2025-01-27T12:00:00Z"
-}
-```
-
-### Reglas de Coordinación
-
-1. **SIEMPRE leer `.agent-lock.json` antes de editar**
-2. **SIEMPRE actualizar `.agent-lock.json` al reservar/liberar**
-3. **NO editar archivos en `files_being_edited` de otro agent**
-4. **Actualizar `last_update` en cada cambio del lock**
-5. **Mantener `tasks_in_progress` y `tasks_completed` actualizados**
-
-### Ejemplo de Uso
-
-**Agent 1 quiere editar `backend/app/routers/workouts.py`:**
-
-```json
-// ANTES: Leer .agent-lock.json
-{
-  "agents": {
-    "agent-2": {
-      "files_being_edited": ["backend/app/services/coach_service.py"]
-    }
-  }
-}
-
-// ✅ workouts.py NO está en lista de agent-2 → PUEDE EDITAR
-
-// DURANTE: Reservar el archivo
-{
-  "agents": {
-    "agent-1": {
-      "files_being_edited": ["backend/app/routers/workouts.py"]
-    },
-    "agent-2": {
-      "files_being_edited": ["backend/app/services/coach_service.py"]
-    }
-  },
-  "last_update": "2025-01-27T12:05:00Z"
-}
-
-// DESPUÉS: Liberar el lock
-{
-  "agents": {
-    "agent-1": {
-      "files_being_edited": [],
-      "tasks_completed": ["code-centralize-auth-workouts"]
-    }
-  },
-  "last_update": "2025-01-27T12:10:00Z"
-}
-```
-
-### Cuando NO Hay Otro Agent Activo
-
-- Si `.agent-lock.json` muestra `agent-2.status: "inactive"` o no existe
-- Puedes trabajar normalmente sin actualizar locks
-- Pero SIEMPRE verificar primero por si acaso
-
-### Manejo de Conflictos
-
-**Si detectas que otro agent está editando el mismo archivo:**
-1. **DETENER** inmediatamente tus cambios
-2. **COMUNICAR** al usuario del conflicto
-3. **ESPERAR** a que el otro agent termine o **ELEGIR** otro archivo/tarea
-4. **COORDINAR** con el usuario para dividir trabajo diferente
-
-### Integración con Planes
-
-**Cuando se ejecuta un plan con múltiples agents:**
-1. **Leer `scripts/agent-coordination.md`** antes de empezar el plan
-2. El plan debe incluir división clara de tareas por agent
-3. Acordar división de trabajo con el usuario si es necesario
-4. Actualizar `.agent-lock.json` con la división acordada
-5. Cada agent debe actualizar `.agent-lock.json` con sus tareas asignadas conforme avanza
-6. Coordinar por módulos/archivos, no por features completas
-7. El sistema funciona para cualquier plan, no solo el actual
-
-**Ejemplo de División para un Plan:**
-- Agent 1: Routers principales (workouts, events, coach, training_plans)
-- Agent 2: Routers secundarios (health, profile, onboarding, etc.)
-- O dividir por tareas: Agent 1 hace refactoring, Agent 2 resuelve bugs
+RunCoach AI - Instrucciones de Desarrollo y Aprendizaje (VERSIÓN FINAL SYNC)
+🎓 Metodología de Aprendizaje Activo (MODO TDA)
+ESTA SECCIÓN ES LA MÁS IMPORTANTE. El Agent debe cumplirla con rigor militar.
+
+🛑 1. El Peaje del Conocimiento (Checkpoint Obligatorio)
+Prohibido pasar al siguiente paso de un plan sin realizar un Quiz de Validación.
+
+Al finalizar cada unidad de trabajo, el Agent debe formular una pregunta de lógica sobre lo que se acaba de hacer (ej: "¿Por qué este dato se guarda en health_metrics y no en users?").
+
+Bloqueo de Progreso: El Agent no tiene permiso para escribir más código hasta que el usuario responda correctamente o demuestre haber entendido el concepto.
+
+🧩 2. Regla de los 3 Puntos (Atomicidad)
+Cambios Pequeños: Máximo 1 archivo modificado por turno.
+
+Foco Único: No implementar más de una micro-funcionalidad a la vez para evitar la dispersión.
+
+Visualización: Cada cambio de lógica en el Backend debe acompañarse de un mini-diagrama ASCII del flujo del dato: UI -> API -> Service -> DB.
+
+🧐 3. Modo Socrático (Resolución de Bugs)
+Cuando el usuario reporte un error, el Agent NO debe dar la solución directamente.
+
+Protocolo de Pistas: El Agent debe dar 3 pistas progresivas para que el usuario intente encontrar el fallo.
+
+Solo si el usuario se bloquea tras las pistas, se propone el código de corrección.
+
+📝 4. Diario de Bordo (LEARNING_LOG.md)
+Al final de cada sesión de trabajo (cuando el usuario diga "terminamos por hoy"), el Agent debe actualizar el archivo LEARNING_LOG.md en la raíz.
+
+Debe resumir: 1. Qué se ha implementado, 2. Qué conceptos técnicos se han aprendido y 3. Qué dejamos pendiente para mañana.
+
+🖥️ 5. Gestión de Carga Cognitiva
+Limpieza de Pestañas: Cada 30 minutos, el Agent debe sugerir cerrar archivos innecesarios para reducir el ruido visual.
+
+Explicaciones Duales: Siempre explicar cada cambio con un nivel Técnico y un nivel Dummies (analogía simple).
+
+Límite de Contexto: Si el chat supera los 20 mensajes, el Agent debe sugerir resumir y empezar un chat nuevo.
+
+🔄 Flujo de Trabajo OBLIGATORIO (ASK → PLAN → AGENT)
+Modo ASK: Para entender. Consultas, dudas de arquitectura y análisis sin tocar código.
+
+Modo PLAN: Para diseñar. El Agent propone una lista de pasos atómicos. No se ejecuta nada aquí.
+
+Modo AGENT: Para ejecutar. Implementa el paso aprobado, aplica el "Peaje del Conocimiento" y espera al OK para el siguiente.
+
+🏗️ Stack Tecnológico (Versiones Reales del Proyecto)
+Frontend
+Next.js: 15.1.3 (App Router)
+
+React: 19.0.0
+
+TypeScript: 5.7.2
+
+Tailwind CSS: 3.4.17
+
+React Query: 5.62.7
+
+Zustand: 5.0.2
+
+Zod: 3.24.1
+
+Recharts: 2.15.0
+
+Backend
+Python: 3.11
+
+FastAPI: 0.115.6
+
+SQLAlchemy: 2.0.36
+
+Pydantic: 2.10.4
+
+Celery: 5.4.0
+
+PostgreSQL: 15
+
+Redis: Latest (v7 recomendado)
+
+🛡️ Seguridad y Calidad Innegociable
+Secrets: Prohibido subir .env. Usar siempre .env.example.
+
+Manejo de Errores: Todo código debe incluir try/catch (TS) o bloques try/except (Python) con logs apropiados.
+
+Type Safety: Uso estricto de interfaces en TS y Type Hints en Python.
+
+Garmin: Tokens OAuth exclusivamente en volumen Docker /app/garmin_tokens/.
+
+🤝 Protocolo Multi-Agent
+Leer .agent-lock.json antes de cada edición.
+
+Reservar archivos en files_being_edited.
+
+Liberar inmediatamente tras el commit.
+
+✅ Checklist de Calidad Final
+Antes de marcar una tarea como "Hecha":
+
+[ ] ¿He hecho el Quiz de Validación?
+
+[ ] ¿He explicado el cambio en modo técnico y modo dummy?
+
+[ ] ¿He actualizado los logs y documentación?
+
+[ ] ¿He verificado que las versiones coinciden con el Stack definido?
+
+Instrucciones para ti:
+
+Guarda este archivo como .cursorrules en la raíz de tu proyecto.
+
+Cierra todas las pestañas de Cursor para empezar de cero sin ruido.
+
+Abre un chat nuevo en modo ASK y dile: "Hola. He actualizado las reglas de mi arquitectura. Vamos a auditar el sistema de autenticación paso a paso. Explícame primero la estructura técnica y una analogía para dummies."

@@ -2,6 +2,7 @@
  * api-client.ts - Centralized API client for backend communication
  */
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import './log-viewer'; // Initialize log viewer - makes logViewer available globally
 import { enrichWorkouts } from './formatters';
 import type {
   AuthResponse,
@@ -45,22 +46,145 @@ class APIClient {
       },
     });
 
-    // Request interceptor to add auth token
+    // Request interceptor to add auth token and log requests
     this.client.interceptors.request.use(
       (config) => {
         const token = this.getToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        
+        // Log ALL requests for monitoring
+        if (typeof window !== 'undefined') {
+          const logData = {
+            timestamp: new Date().toISOString(),
+            method: config.method?.toUpperCase(),
+            url: config.url,
+            baseURL: config.baseURL,
+            fullURL: `${config.baseURL}${config.url}`,
+            hasAuth: !!token,
+            params: config.params,
+            data: config.data,
+          };
+          
+          // Log to console with structured format
+          console.group(`🔵 API REQUEST [${logData.method}] ${logData.url}`);
+          console.log('📤 Request Details:', logData);
+          console.groupEnd();
+          
+          // Also store in window for debugging (last 50 requests)
+          if (!window.__API_LOGS__) {
+            window.__API_LOGS__ = [];
+          }
+          window.__API_LOGS__.push({
+            type: 'REQUEST',
+            ...logData,
+          });
+          // Keep only last 50
+          if (window.__API_LOGS__.length > 50) {
+            window.__API_LOGS__.shift();
+          }
+        }
+        
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        if (typeof window !== 'undefined') {
+          console.error('❌ API REQUEST ERROR:', error);
+          if (window.__API_LOGS__) {
+            window.__API_LOGS__.push({
+              type: 'REQUEST_ERROR',
+              timestamp: new Date().toISOString(),
+              error: error.message,
+            });
+          }
+        }
+        return Promise.reject(error);
+      }
     );
 
-    // Response interceptor for error handling with automatic token refresh
+    // Response interceptor for error handling with automatic token refresh and logging
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        // Log successful responses
+        if (typeof window !== 'undefined') {
+          // Pretty print data for important endpoints
+          const isImportantEndpoint = response.config.url?.includes('training-plans') || 
+                                     response.config.url?.includes('workouts') ||
+                                     response.config.url?.includes('profile');
+          
+          const logData = {
+            timestamp: new Date().toISOString(),
+            method: response.config.method?.toUpperCase(),
+            url: response.config.url,
+            status: response.status,
+            statusText: response.statusText,
+            dataSize: response.data ? JSON.stringify(response.data).length : 0,
+            data: response.data,
+          };
+          
+          console.group(`✅ API RESPONSE [${logData.status}] ${response.config.method?.toUpperCase()} ${response.config.url}`);
+          console.log('📥 Response Details:', logData);
+          if (isImportantEndpoint && response.data) {
+            console.log('📊 Response Data:', JSON.stringify(response.data, null, 2));
+          }
+          console.groupEnd();
+          
+          if (window.__API_LOGS__) {
+            window.__API_LOGS__.push({
+              type: 'RESPONSE',
+              ...logData,
+            });
+            // Keep only last 50
+            if (window.__API_LOGS__.length > 50) {
+              window.__API_LOGS__.shift();
+            }
+          }
+        }
+        return response;
+      },
       async (error: AxiosError<APIError>) => {
+        // Log errors
+        if (typeof window !== 'undefined') {
+          const logData = {
+            timestamp: new Date().toISOString(),
+            method: error.config?.method?.toUpperCase(),
+            url: error.config?.url,
+            fullURL: error.config ? `${error.config.baseURL}${error.config.url}` : 'unknown',
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            errorMessage: error.message,
+            responseData: error.response?.data,
+            requestData: error.config?.data,
+          };
+          
+          // Color code based on error type
+          const is400 = error.response?.status === 400;
+          const is401 = error.response?.status === 401;
+          const is404 = error.response?.status === 404;
+          const is500 = error.response?.status >= 500;
+          
+          const emoji = is400 ? '⚠️' : is401 ? '🔐' : is404 ? '🔍' : is500 ? '💥' : '❌';
+          const color = is400 ? 'yellow' : is401 ? 'orange' : is404 ? 'blue' : is500 ? 'red' : 'red';
+          
+          console.group(`%c${emoji} API ERROR [${logData.status || 'NETWORK'}] ${logData.method} ${logData.url}`, `color: ${color}; font-weight: bold;`);
+          console.error('📥 Error Details:', logData);
+          if (error.response?.data) {
+            console.error('Response Data:', error.response.data);
+          }
+          console.groupEnd();
+          
+          if (window.__API_LOGS__) {
+            window.__API_LOGS__.push({
+              type: 'ERROR',
+              ...logData,
+            });
+            // Keep only last 50
+            if (window.__API_LOGS__.length > 50) {
+              window.__API_LOGS__.shift();
+            }
+          }
+        }
         const originalRequest = error.config as InternalAxiosRequestConfig | undefined;
         
         // Only handle 401 errors (Unauthorized)
@@ -277,6 +401,16 @@ class APIClient {
       credentials
     );
     return response.data;
+  }
+
+  async getGarminStatus(): Promise<{ connected: boolean; garmin_email?: string; connected_at?: string; last_sync?: string }> {
+    try {
+      const response = await this.client.get('/api/v1/garmin/status');
+      return response.data;
+    } catch (error: any) {
+      // Si hay error, asumimos que no está conectado
+      return { connected: false };
+    }
   }
 
   async syncGarmin(days: number = 30): Promise<SyncResponse> {
@@ -600,8 +734,10 @@ class APIClient {
   /**
    * Delete a training plan
    */
-  async deleteTrainingPlan(planId: number): Promise<void> {
-    await this.client.delete(`/api/v1/training-plans/${planId}`);
+  async deleteTrainingPlan(planId: number | string): Promise<void> {
+    // Backend expects string plan_id
+    const planIdStr = String(planId);
+    await this.client.delete(`/api/v1/training-plans/${planIdStr}`);
   }
 
   // ============================================================================

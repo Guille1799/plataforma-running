@@ -5,14 +5,19 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 
 const SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6 horas en milisegundos
 const STORAGE_KEY = 'lastGarminSync';
 const SYNCING_KEY = 'garminSyncing';
 
 export function useAutoSync(forceOnMount: boolean = true) {
+    const { userProfile } = useAuth();
     const syncingRef = useRef(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    
+    // Solo sincronizar si el usuario tiene Garmin como dispositivo principal
+    const shouldAttemptSync = userProfile?.primary_device === 'garmin';
 
     const shouldSync = (): boolean => {
         const lastSync = localStorage.getItem(STORAGE_KEY);
@@ -29,6 +34,12 @@ export function useAutoSync(forceOnMount: boolean = true) {
     };
 
     const performSync = async (force: boolean = false) => {
+        // Solo intentar sincronizar si el usuario tiene Garmin
+        if (!shouldAttemptSync) {
+            console.log('[AutoSync] User does not have Garmin as primary device, skipping sync');
+            return;
+        }
+
         // Prevent multiple simultaneous syncs
         if (syncingRef.current) {
             console.log('[AutoSync] Sync already in progress, skipping');
@@ -45,6 +56,22 @@ export function useAutoSync(forceOnMount: boolean = true) {
             setIsSyncing(true);
             localStorage.setItem(SYNCING_KEY, 'true');
             window.dispatchEvent(new Event('garmin-sync-started'));
+
+            // First check if Garmin is connected before attempting sync
+            try {
+                const status = await apiClient.getGarminStatus();
+                if (!status.connected) {
+                    console.log('[AutoSync] Garmin not connected, skipping auto-sync');
+                    // No retry for 24 hours
+                    localStorage.setItem(STORAGE_KEY, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+                    return;
+                }
+            } catch (statusError: any) {
+                // Si hay error al verificar el status (ej: 401), no intentar sync
+                console.log('[AutoSync] Error checking Garmin status, skipping sync:', statusError.response?.status || statusError.message);
+                localStorage.setItem(STORAGE_KEY, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+                return;
+            }
 
             console.log('[AutoSync] Starting automatic sync...');
 
@@ -64,12 +91,13 @@ export function useAutoSync(forceOnMount: boolean = true) {
                 console.log('[AutoSync] No new workouts to sync');
             }
         } catch (error: any) {
-            console.warn('[AutoSync] Failed to sync:', error.message);
-
-            // If it's a 401 (not authenticated), don't retry soon
-            if (error.response?.status === 401) {
-                console.log('[AutoSync] Not authenticated, will not auto-sync again');
+            // Si es 400 (Garmin no conectado) o 401 (no autenticado), no es un error crítico
+            if (error.response?.status === 400 || error.response?.status === 401) {
+                console.log('[AutoSync] Garmin not connected or not authenticated, skipping auto-sync');
+                // No retry for 24 hours
                 localStorage.setItem(STORAGE_KEY, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+            } else {
+                console.warn('[AutoSync] Failed to sync:', error.message);
             }
         } finally {
             syncingRef.current = false;
@@ -80,8 +108,31 @@ export function useAutoSync(forceOnMount: boolean = true) {
     };
 
     useEffect(() => {
-        // Always sync on mount (on login)
+        // Esperar a que userProfile esté cargado antes de intentar sincronizar
+        if (!userProfile) {
+            console.log('[AutoSync] Waiting for userProfile to load...');
+            return;
+        }
+
+        // Solo sincronizar si el usuario tiene Garmin como dispositivo principal
+        if (!shouldAttemptSync) {
+            return;
+        }
+
+        // Always sync on mount (on login) - pero solo si no hay un sync reciente
         if (forceOnMount) {
+            // Verificar si ya hay un sync muy reciente (menos de 1 minuto) para evitar múltiples syncs
+            const lastSync = localStorage.getItem(STORAGE_KEY);
+            if (lastSync) {
+                const lastSyncTime = new Date(lastSync).getTime();
+                const now = Date.now();
+                const timeSinceLastSync = now - lastSyncTime;
+                // Si la última sincronización fue hace menos de 1 minuto, no sincronizar de nuevo
+                if (timeSinceLastSync < 60 * 1000) {
+                    console.log('[AutoSync] Very recent sync detected, skipping mount sync');
+                    return;
+                }
+            }
             performSync(true);
         }
 
@@ -93,7 +144,7 @@ export function useAutoSync(forceOnMount: boolean = true) {
         return () => {
             clearInterval(checkInterval);
         };
-    }, []);
+    }, [userProfile, shouldAttemptSync, forceOnMount]);
 
     return {
         forceSync: performSync,

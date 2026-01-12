@@ -515,83 +515,237 @@ def get_personalized_recommendation(
     Tailors coaching style and recommendations to the user's primary device
     and selected use case (fitness tracker, training coach, race prep, etc).
     """
-    primary_device = current_user.primary_device or 'manual'
-    use_case = current_user.use_case or 'general_health'
-    coach_style = current_user.coach_style_preference or 'balanced'
-    
-    # Get base recommendation
-    base_recommendation = _get_coach_service().generate_health_aware_recommendation(db, current_user)
-    
-    # Customize based on device type
-    device_focus = {
-        'garmin': {
-            'title': 'Garmin Advanced Training',
-            'focus': 'Advanced metrics (HRV, Body Battery, Training Load)',
-            'tips': [
-                'Monitor your Body Battery - train hard when it\'s above 60',
-                'Use HRV trends to identify overtraining patterns',
-                'Respect your training load recommendations from your watch'
-            ]
-        },
-        'xiaomi': {
-            'title': 'Daily Activity Tracker',
-            'focus': 'Consistent activity and sleep optimization',
-            'tips': [
-                'Aim for consistent daily activity levels',
-                'Sleep quality matters more than quantity',
-                'Build streaks of consecutive training days'
-            ]
-        },
-        'manual': {
-            'title': 'Personal Training Log',
-            'focus': 'Self-awareness and goal tracking',
-            'tips': [
-                'Log your workouts consistently for better insights',
-                'Pay attention to how you feel each day',
-                'Track personal records and celebrate achievements'
-            ]
-        },
-        'apple': {
-            'title': 'Apple Health Integration',
-            'focus': 'Holistic wellness tracking',
-            'tips': [
-                'Your Apple Watch captures detailed metrics',
-                'Focus on activity rings and workout consistency',
-                'Use heart rate data to guide intensity'
-            ]
-        },
-        'strava': {
-            'title': 'Social Training Network',
-            'focus': 'Community engagement and segment PRs',
-            'tips': [
-                'Use segments to track improvement over time',
-                'Share your achievements with the community',
-                'Find running partners through Strava'
-            ]
+    # #region agent log
+    import json
+    import os
+    from datetime import datetime
+    DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+    try:
+        log_dir = os.path.dirname(DEBUG_LOG_PATH)
+        os.makedirs(log_dir, exist_ok=True)
+        log_entry = {
+            "timestamp": int(datetime.utcnow().timestamp() * 1000),
+            "location": "coach.py:get_personalized_recommendation",
+            "message": "[COACH] Starting personalized recommendation",
+            "level": "info",
+            "data": {"user_id": current_user.id, "step": "start"},
+            "sessionId": "debug-session",
+            "runId": "coach-debug",
+            "hypothesisId": "H2"
         }
-    }
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            f.flush()
+    except:
+        pass
+    # #endregion
     
-    # Customize based on use case
-    use_case_guidance = {
-        'fitness_tracker': 'Focus on consistency and daily movement. No pressure for intensity.',
-        'training_coach': 'Follow structured training plans. Balance easy and hard efforts.',
-        'race_prep': 'Follow your training plan religiously. Every workout matters for peak race fitness.',
-        'general_health': 'Exercise for overall wellness. Enjoy the process, don\'t obsess over metrics.'
-    }
+    try:
+        primary_device = current_user.primary_device or 'manual'
+        use_case = current_user.use_case or 'general_health'
+        coach_style = current_user.coach_style_preference or 'balanced'
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] Before calling _get_coach_service()",
+                "level": "info",
+                "data": {"user_id": current_user.id, "step": "before_get_service", "primary_device": primary_device},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        # Get base recommendation
+        coach_service = _get_coach_service()
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] Before calling generate_health_aware_recommendation()",
+                "level": "info",
+                "data": {"user_id": current_user.id, "step": "before_generate", "coach_service_exists": coach_service is not None},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        base_recommendation = coach_service.generate_health_aware_recommendation(db, current_user)
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] After generate_health_aware_recommendation()",
+                "level": "info",
+                "data": {"user_id": current_user.id, "step": "after_generate", "has_recommendation": base_recommendation is not None},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        # Customize based on device type
+        device_focus = {
+            'garmin': {
+                'title': 'Garmin Advanced Training',
+                'focus': 'Advanced metrics (HRV, Body Battery, Training Load)',
+                'tips': [
+                    'Monitor your Body Battery - train hard when it\'s above 60',
+                    'Use HRV trends to identify overtraining patterns',
+                    'Respect your training load recommendations from your watch'
+                ]
+            },
+            'xiaomi': {
+                'title': 'Daily Activity Tracker',
+                'focus': 'Consistent activity and sleep optimization',
+                'tips': [
+                    'Aim for consistent daily activity levels',
+                    'Sleep quality matters more than quantity',
+                    'Build streaks of consecutive training days'
+                ]
+            },
+            'manual': {
+                'title': 'Personal Training Log',
+                'focus': 'Self-awareness and goal tracking',
+                'tips': [
+                    'Log your workouts consistently for better insights',
+                    'Pay attention to how you feel each day',
+                    'Track personal records and celebrate achievements'
+                ]
+            },
+            'apple': {
+                'title': 'Apple Health Integration',
+                'focus': 'Holistic wellness tracking',
+                'tips': [
+                    'Your Apple Watch captures detailed metrics',
+                    'Focus on activity rings and workout consistency',
+                    'Use heart rate data to guide intensity'
+                ]
+            },
+            'strava': {
+                'title': 'Social Training Network',
+                'focus': 'Community engagement and segment PRs',
+                'tips': [
+                    'Use segments to track improvement over time',
+                    'Share your achievements with the community',
+                    'Find running partners through Strava'
+                ]
+            }
+        }
+        
+        # Customize based on use case
+        use_case_guidance = {
+            'fitness_tracker': 'Focus on consistency and daily movement. No pressure for intensity.',
+            'training_coach': 'Follow structured training plans. Balance easy and hard efforts.',
+            'race_prep': 'Follow your training plan religiously. Every workout matters for peak race fitness.',
+            'general_health': 'Exercise for overall wellness. Enjoy the process, don\'t obsess over metrics.'
+        }
+        
+        # Build personalized response
+        personalized = base_recommendation.copy()
+        personalized['device_customization'] = device_focus.get(primary_device, device_focus['manual'])
+        personalized['use_case_guidance'] = use_case_guidance.get(use_case, use_case_guidance['general_health'])
+        personalized['coaching_style'] = coach_style
+        
+        # Add device-specific metrics to watch
+        if primary_device == 'garmin':
+            personalized['key_metrics'] = ['body_battery', 'hrv_ms', 'stress_level', 'training_load']
+        elif primary_device == 'xiaomi':
+            personalized['key_metrics'] = ['sleep_score', 'daily_steps', 'activity_streak']
+        else:
+            personalized['key_metrics'] = ['workout_frequency', 'total_distance', 'average_pace']
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] Returning personalized recommendation",
+                "level": "info",
+                "data": {"user_id": current_user.id, "step": "return"},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        return personalized
     
-    # Build personalized response
-    personalized = base_recommendation.copy()
-    personalized['device_customization'] = device_focus.get(primary_device, device_focus['manual'])
-    personalized['use_case_guidance'] = use_case_guidance.get(use_case, use_case_guidance['general_health'])
-    personalized['coaching_style'] = coach_style
-    
-    # Add device-specific metrics to watch
-    if primary_device == 'garmin':
-        personalized['key_metrics'] = ['body_battery', 'hrv_ms', 'stress_level', 'training_load']
-    elif primary_device == 'xiaomi':
-        personalized['key_metrics'] = ['sleep_score', 'daily_steps', 'activity_streak']
-    else:
-        personalized['key_metrics'] = ['workout_frequency', 'total_distance', 'average_pace']
-    
-    return personalized
+    except ValueError as e:
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] ValueError - GROQ_API_KEY not configured",
+                "level": "error",
+                "data": {"user_id": current_user.id, "error": str(e), "step": "error"},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        logger.error(f"[COACH] GROQ_API_KEY not configured: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI Coach service is not configured. Please set GROQ_API_KEY environment variable."
+        )
+    except Exception as e:
+        # #region agent log
+        try:
+            import traceback
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "coach.py:get_personalized_recommendation",
+                "message": "[COACH] Exception in personalized recommendation",
+                "level": "error",
+                "data": {"user_id": current_user.id, "error": str(e), "traceback": traceback.format_exc(), "step": "error"},
+                "sessionId": "debug-session",
+                "runId": "coach-debug",
+                "hypothesisId": "H2"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        logger.error(f"[COACH] Error generating personalized recommendation: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating recommendation: {str(e)}"
+        )
 

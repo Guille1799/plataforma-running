@@ -56,8 +56,10 @@ export function GarminDashboard() {
     const workoutDate = new Date(w.date || w.start_time);
     const monthAgo = new Date();
     monthAgo.setDate(monthAgo.getDate() - 30);
-    if (workoutDate >= monthAgo && w.distance_km) {
-      return sum + w.distance_km;
+    if (workoutDate >= monthAgo) {
+      // Handle both distance_meters and distance_km (fallback)
+      const distance = w.distance_meters || (w.distance_km ? w.distance_km * 1000 : 0);
+      return sum + distance;
     }
     return sum;
   }, 0);
@@ -89,8 +91,8 @@ export function GarminDashboard() {
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2">Training Status</h1>
-          <p className="text-slate-400">Garmin Advanced Metrics</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Estado de Entrenamiento</h1>
+          <p className="text-slate-400">Métricas Avanzadas de Garmin</p>
         </div>
 
         {/* Readiness Badge */}
@@ -109,7 +111,7 @@ export function GarminDashboard() {
             <CardContent>
               <div className="text-3xl font-bold">{bodyBattery}%</div>
               <p className="text-xs text-slate-500 mt-1">
-                {bodyBattery >= 70 ? 'Excellent' : bodyBattery >= 50 ? 'Good' : 'Low'}
+                {bodyBattery >= 70 ? 'Excelente' : bodyBattery >= 50 ? 'Bueno' : 'Bajo'}
               </p>
             </CardContent>
           </Card>
@@ -124,7 +126,7 @@ export function GarminDashboard() {
             </CardHeader>
             <CardContent>
               <div className={`text-3xl font-bold ${getHRVColor(hrv)}`}>{hrv.toFixed(1)}ms</div>
-              <p className="text-xs text-slate-500 mt-1">Heart Rate Variability</p>
+              <p className="text-xs text-slate-500 mt-1">Variabilidad de Frecuencia Cardíaca</p>
             </CardContent>
           </Card>
 
@@ -133,12 +135,12 @@ export function GarminDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <Activity className="h-4 w-4" />
-                Readiness
+                Preparación
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-cyan-400">{readinessScore}</div>
-              <p className="text-xs text-slate-500 mt-1">/100 Score</p>
+              <p className="text-xs text-slate-500 mt-1">/100 Puntuación</p>
             </CardContent>
           </Card>
 
@@ -147,12 +149,12 @@ export function GarminDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
-                Stress
+                Estrés
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-orange-400">{stressLevel}</div>
-              <p className="text-xs text-slate-500 mt-1">Stress Level</p>
+              <p className="text-xs text-slate-500 mt-1">Nivel de Estrés</p>
             </CardContent>
           </Card>
         </div>
@@ -163,12 +165,12 @@ export function GarminDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                This Week
+                Esta Semana
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-blue-400">{thisWeekWorkouts}</div>
-              <p className="text-xs text-slate-500 mt-1">workouts</p>
+              <p className="text-xs text-slate-500 mt-1">entrenamientos</p>
             </CardContent>
           </Card>
 
@@ -176,12 +178,12 @@ export function GarminDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
-                This Month
+                Este Mes
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-green-400">{formatDistance(thisMonthDistance)}</div>
-              <p className="text-xs text-slate-500 mt-1">total distance</p>
+              <p className="text-xs text-slate-500 mt-1">distancia total</p>
             </CardContent>
           </Card>
 
@@ -189,7 +191,7 @@ export function GarminDashboard() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
                 <Activity className="h-4 w-4" />
-                Avg Pace
+                Ritmo Promedio
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -226,7 +228,7 @@ export function GarminDashboard() {
         <div className="pt-8 border-t border-slate-700">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-blue-400" />
-            Performance Trends
+            Tendencias de Rendimiento
           </h2>
           <PerformanceAnalytics />
         </div>
@@ -235,7 +237,7 @@ export function GarminDashboard() {
         <div className="pt-8 border-t border-slate-700">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Calendar className="h-6 w-6 text-purple-400" />
-            This Week's Goals
+            Objetivos de Esta Semana
           </h2>
           <WeeklyGoalsTracker />
         </div>
@@ -249,7 +251,7 @@ export function GarminDashboard() {
         <div className="pt-8 border-t border-slate-700">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Heart className="h-6 w-6 text-red-400" />
-            Injury Prevention
+            Prevención de Lesiones
           </h2>
           <InjuryPrevention />
         </div>
@@ -258,7 +260,7 @@ export function GarminDashboard() {
         <div className="pt-8 border-t border-slate-700">
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-green-400" />
-            Export & Analytics
+            Exportar y Análisis
           </h2>
           <ExportAnalytics />
         </div>

@@ -11,6 +11,12 @@ export function useDashboardLayout() {
 
   const primaryDevice = userProfile?.primary_device || 'manual';
 
+  // Debug: Log para verificar qué device tiene el usuario
+  if (typeof window !== 'undefined') {
+    console.log('[useDashboardLayout] userProfile:', userProfile);
+    console.log('[useDashboardLayout] primaryDevice:', primaryDevice);
+  }
+
   const getDashboardComponent = () => {
     switch (primaryDevice) {
       case 'garmin':

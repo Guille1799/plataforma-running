@@ -14,7 +14,7 @@ import {
   formatDistance,
   formatDate,
 } from '@/lib/formatters'
-import { Activity } from 'lucide-react'
+import { Activity, Plus } from 'lucide-react'
 import type { Workout } from '@/lib/types'
 
 export default function WorkoutsPage() {
@@ -102,11 +102,19 @@ export default function WorkoutsPage() {
   return (
     <div className="min-h-screen bg-slate-950 p-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-2">Mis Entrenamientos</h1>
-        <p className="text-slate-400">
-          {filteredWorkouts.length} entrenamientos ({stats.distance.toFixed(1)} km)
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold text-white mb-2">Mis Entrenamientos</h1>
+          <p className="text-slate-400">
+            {filteredWorkouts.length} entrenamientos ({stats.distance.toFixed(1)} km)
+          </p>
+        </div>
+        <Link href="/workouts/new">
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            <Activity className="h-4 w-4 mr-2" />
+            Nuevo Entrenamiento
+          </Button>
+        </Link>
       </div>
 
       {/* Stats Cards */}

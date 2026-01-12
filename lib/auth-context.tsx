@@ -148,6 +148,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userData = await apiClient.getCurrentUser();
       setUser(userData);
+      // También refrescar el perfil de onboarding
+      try {
+        const profile = await apiClient.getOnboardingStatus();
+        if (profile) {
+          setUserProfile(profile);
+          setOnboardingCompleted(profile.onboarding_completed || false);
+        }
+      } catch (error) {
+        console.error('Failed to refresh onboarding profile:', error);
+      }
 
       // Also refetch profile and onboarding status
       const profile = await apiClient.getOnboardingStatus();

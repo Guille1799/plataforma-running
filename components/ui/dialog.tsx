@@ -47,8 +47,9 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   ({ className, children, onClose, ...props }, ref) => (
     <div
       ref={ref}
-      className={`relative w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-lg ${className}`}
+      className={`relative w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-lg ${className || ''}`}
       {...props}
+      onClick={(e) => e.stopPropagation()}
     >
       {children}
     </div>
@@ -57,26 +58,26 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
 DialogContent.displayName = 'DialogContent';
 
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`flex items-center justify-between p-6 border-b border-gray-200 ${className}`} {...props} />
+  <div className={`flex items-center justify-between p-6 border-b ${className || 'border-gray-200'}`} {...props} />
 );
 DialogHeader.displayName = 'DialogHeader';
 
 const DialogTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h2 ref={ref} className={`text-lg font-semibold text-gray-900 ${className}`} {...props} />
+    <h2 ref={ref} className={`text-lg font-semibold ${className || 'text-gray-900'}`} {...props} />
   )
 );
 DialogTitle.displayName = 'DialogTitle';
 
 const DialogDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
-    <p ref={ref} className={`text-sm text-gray-600 ${className}`} {...props} />
+    <p ref={ref} className={`text-sm ${className || 'text-gray-600'}`} {...props} />
   )
 );
 DialogDescription.displayName = 'DialogDescription';
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`flex gap-3 justify-end p-6 border-t border-gray-200 ${className}`} {...props} />
+  <div className={`flex gap-3 justify-end p-6 border-t ${className || 'border-gray-200'}`} {...props} />
 );
 DialogFooter.displayName = 'DialogFooter';
 

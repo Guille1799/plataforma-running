@@ -47,6 +47,12 @@ class VercelCORSMiddleware(BaseHTTPMiddleware):
         if origin in self.allowed_origins:
             return True
         
+        # Check if origin is localhost (for development)
+        # Pattern: http://localhost:* or http://127.0.0.1:*
+        localhost_pattern = r'^http://(localhost|127\.0\.0\.1)(:\d+)?$'
+        if re.match(localhost_pattern, origin):
+            return True
+        
         # Check if origin is a Vercel preview URL (*.vercel.app)
         # Pattern: https://*.vercel.app or https://*-*.vercel.app
         vercel_pattern = r'^https://[a-zA-Z0-9-]+(-[a-zA-Z0-9]+)*\.vercel\.app$'
@@ -59,9 +65,53 @@ class VercelCORSMiddleware(BaseHTTPMiddleware):
         """Handle CORS headers in requests."""
         origin = request.headers.get("origin")
         
+        # #region agent log
+        import json
+        import os
+        from datetime import datetime
+        DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+        try:
+            log_dir = os.path.dirname(DEBUG_LOG_PATH)
+            os.makedirs(log_dir, exist_ok=True)
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "cors.py:dispatch",
+                "message": "[CORS] Request received",
+                "level": "info",
+                "data": {"origin": origin, "method": request.method, "path": str(request.url.path), "step": "start"},
+                "sessionId": "debug-session",
+                "runId": "cors-debug",
+                "hypothesisId": "H1"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
         # Handle preflight OPTIONS request
         if request.method == "OPTIONS":
-            if origin and self.is_origin_allowed(origin):
+            is_allowed = origin and self.is_origin_allowed(origin)
+            # #region agent log
+            try:
+                log_entry = {
+                    "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                    "location": "cors.py:dispatch",
+                    "message": "[CORS] OPTIONS preflight check",
+                    "level": "info",
+                    "data": {"origin": origin, "is_allowed": is_allowed, "step": "options_check"},
+                    "sessionId": "debug-session",
+                    "runId": "cors-debug",
+                    "hypothesisId": "H1"
+                }
+                with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                    f.flush()
+            except:
+                pass
+            # #endregion
+            if is_allowed:
                 headers = {
                     "Access-Control-Allow-Origin": origin,
                     "Access-Control-Allow-Methods": ", ".join(self.allow_methods),
@@ -78,7 +128,26 @@ class VercelCORSMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         
         # Add CORS headers to response if origin is allowed
-        if origin and self.is_origin_allowed(origin):
+        is_allowed = origin and self.is_origin_allowed(origin)
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "cors.py:dispatch",
+                "message": "[CORS] Adding headers to response",
+                "level": "info",
+                "data": {"origin": origin, "is_allowed": is_allowed, "status_code": response.status_code, "step": "add_headers"},
+                "sessionId": "debug-session",
+                "runId": "cors-debug",
+                "hypothesisId": "H1"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
             if self.allow_credentials:
                 response.headers["Access-Control-Allow-Credentials"] = "true"

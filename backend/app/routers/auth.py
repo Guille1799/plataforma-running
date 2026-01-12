@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from ..database import get_db
 from ..core.config import settings
 from ..utils.rate_limiter import limiter
 from ..dependencies.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 
 class UserCreate(BaseModel):
@@ -139,36 +142,203 @@ def login_user(
     Raises:
         HTTPException: 401 if credentials invalid
     """
-    # Find user by email
-    db_user = crud.get_user_by_email(db, email=credentials.email)
+    # #region agent log
+    import json
+    import os
+    from datetime import datetime
+    DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), ".cursor", "debug.log")
+    try:
+        log_dir = os.path.dirname(DEBUG_LOG_PATH)
+        os.makedirs(log_dir, exist_ok=True)
+        log_entry = {
+            "timestamp": int(datetime.utcnow().timestamp() * 1000),
+            "location": "auth.py:login_user",
+            "message": "[AUTH] Login request received",
+            "level": "info",
+            "data": {"email": credentials.email, "step": "start"},
+            "sessionId": "debug-session",
+            "runId": "login-debug",
+            "hypothesisId": "H3"
+        }
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            f.flush()
+    except:
+        pass
+    # #endregion
     
-    # Verify user exists and password is correct
-    if not db_user or not security.verify_password(credentials.password, db_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+    try:
+        # Find user by email
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] Searching for user by email",
+                "level": "info",
+                "data": {"email": credentials.email, "step": "before_get_user"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        db_user = crud.get_user_by_email(db, email=credentials.email)
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] User found",
+                "level": "info",
+                "data": {"email": credentials.email, "user_found": db_user is not None, "user_id": db_user.id if db_user else None, "step": "after_get_user"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        # Verify user exists and password is correct
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] Verifying password",
+                "level": "info",
+                "data": {"email": credentials.email, "step": "before_verify_password"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        if not db_user or not security.verify_password(credentials.password, db_user.hashed_password):
+            # #region agent log
+            try:
+                log_entry = {
+                    "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                    "location": "auth.py:login_user",
+                    "message": "[AUTH] Invalid credentials",
+                    "level": "error",
+                    "data": {"email": credentials.email, "user_exists": db_user is not None, "step": "invalid_credentials"},
+                    "sessionId": "debug-session",
+                    "runId": "login-debug",
+                    "hypothesisId": "H3"
+                }
+                with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                    f.flush()
+            except:
+                pass
+            # #endregion
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Generate tokens
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] Generating tokens",
+                "level": "info",
+                "data": {"user_id": db_user.id, "step": "before_generate_tokens"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        access_token = security.create_access_token(
+            data={"sub": str(db_user.id)},
+            secret_key=settings.secret_key,
+            algorithm=settings.algorithm,
+            expire_minutes=settings.access_token_expire_minutes
         )
-    
-    # Generate tokens
-    access_token = security.create_access_token(
-        data={"sub": str(db_user.id)},
-        secret_key=settings.secret_key,
-        algorithm=settings.algorithm,
-        expire_minutes=settings.access_token_expire_minutes
-    )
-    refresh_token = security.create_refresh_token(
-        data={"sub": str(db_user.id)},
-        secret_key=settings.secret_key,
-        algorithm=settings.algorithm,
-        expire_days=settings.refresh_token_expire_days
-    )
-    
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=UserOut.model_validate(db_user)
-    )
+        refresh_token = security.create_refresh_token(
+            data={"sub": str(db_user.id)},
+            secret_key=settings.secret_key,
+            algorithm=settings.algorithm,
+            expire_days=settings.refresh_token_expire_days
+        )
+        
+        # #region agent log
+        try:
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] Tokens generated, returning response",
+                "level": "info",
+                "data": {"user_id": db_user.id, "has_access_token": access_token is not None, "has_refresh_token": refresh_token is not None, "step": "before_return"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=UserOut.model_validate(db_user)
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 401)
+        raise
+    except Exception as e:
+        # #region agent log
+        try:
+            import traceback
+            log_entry = {
+                "timestamp": int(datetime.utcnow().timestamp() * 1000),
+                "location": "auth.py:login_user",
+                "message": "[AUTH] Exception in login",
+                "level": "error",
+                "data": {"email": credentials.email, "error": str(e), "traceback": traceback.format_exc(), "step": "exception"},
+                "sessionId": "debug-session",
+                "runId": "login-debug",
+                "hypothesisId": "H3"
+            }
+            with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                f.flush()
+        except:
+            pass
+        # #endregion
+        logger.error(f"[AUTH] Login error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error during login: {str(e)}"
+        )
 class RefreshTokenRequest(BaseModel):
     """Schema for token refresh request.
     

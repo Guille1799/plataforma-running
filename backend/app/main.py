@@ -6,12 +6,39 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 import json
 import logging
+import sys
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-# Configure logging
+# Configure logging to show INFO and above in console
+# Force unbuffered output to ensure logs appear immediately
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.StreamHandler(sys.stdout),  # Explicitly use stdout
+        logging.StreamHandler(sys.stderr),  # Also log errors to stderr
+    ],
+    force=True  # Override any existing configuration
+)
 logger = logging.getLogger(__name__)
+# Set specific loggers to INFO and ensure they output to console
+garmin_logger = logging.getLogger("app.services.garmin_service")
+garmin_logger.setLevel(logging.INFO)
+# Ensure garmin_service logger has a console handler
+if not any(isinstance(h, logging.StreamHandler) for h in garmin_logger.handlers):
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+    garmin_logger.addHandler(console_handler)
+    garmin_logger.propagate = True  # Also propagate to root logger
+
+garmin_router_logger = logging.getLogger("app.routers.garmin")
+garmin_router_logger.setLevel(logging.INFO)
+# Ensure handlers flush immediately
+for handler in logging.getLogger().handlers:
+    handler.setStream(sys.stdout if handler.level < logging.ERROR else sys.stderr)
 
 from . import models
 from .database import engine

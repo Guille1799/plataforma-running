@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { GoalsManager } from '@/components/GoalsManager';
 
 export default function ProfilePage() {
@@ -35,6 +36,7 @@ export default function ProfilePage() {
     max_heart_rate: '',
     running_level: 'intermediate',
     coaching_style: 'balanced',
+    custom_prompt: '',
   });
 
   const handleAddGoal = (goal: Goal) => {
@@ -60,15 +62,40 @@ export default function ProfilePage() {
 
   useEffect(() => {
     // Load user profile data
-    if (user) {
-      setFormData({
-        height_cm: user.height_cm?.toString() || '',
-        weight_kg: user.weight_kg?.toString() || '',
-        max_heart_rate: user.max_heart_rate?.toString() || '190',
-        running_level: user.running_level || 'intermediate',
-        coaching_style: user.coaching_style || 'balanced',
-      });
-    }
+    const loadProfile = async () => {
+      if (user) {
+        try {
+          const profileData = await apiClient.getProfile();
+          setFormData({
+            height_cm: user.height_cm?.toString() || '',
+            weight_kg: user.weight_kg?.toString() || '',
+            max_heart_rate: user.max_heart_rate?.toString() || '190',
+            running_level: user.running_level || 'intermediate',
+            coaching_style: user.coaching_style || 'balanced',
+            custom_prompt: profileData.preferences?.custom_prompt || '',
+          });
+          setProfile({
+            running_level: profileData.running_level || 'intermediate',
+            max_heart_rate: profileData.max_heart_rate || 190,
+            coaching_style: profileData.coaching_style || 'balanced',
+            goals: profileData.goals || [],
+            preferences: profileData.preferences || {},
+          });
+        } catch (err) {
+          console.error('Error loading profile:', err);
+          // Fallback to user data
+          setFormData({
+            height_cm: user.height_cm?.toString() || '',
+            weight_kg: user.weight_kg?.toString() || '',
+            max_heart_rate: user.max_heart_rate?.toString() || '190',
+            running_level: user.running_level || 'intermediate',
+            coaching_style: user.coaching_style || 'balanced',
+            custom_prompt: (user.preferences as any)?.custom_prompt || '',
+          });
+        }
+      }
+    };
+    loadProfile();
   }, [user]);
 
   const handleInputChange = (field: string, value: string) => {
@@ -84,8 +111,17 @@ export default function ProfilePage() {
     setSuccess('');
 
     try {
-      // Aquí iría la llamada al backend para guardar el perfil
-      // await apiClient.updateProfile(formData);
+      const profileUpdate: Partial<AthleteProfile> = {
+        running_level: formData.running_level as any,
+        max_heart_rate: parseInt(formData.max_heart_rate) || undefined,
+        coaching_style: formData.coaching_style as any,
+        preferences: {
+          ...profile.preferences,
+          custom_prompt: formData.coaching_style === 'custom' ? formData.custom_prompt : undefined,
+        },
+      };
+      
+      await apiClient.updateProfile(profileUpdate);
       setSuccess('¡Perfil actualizado correctamente!');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error al guardar perfil');
@@ -200,12 +236,53 @@ export default function ProfilePage() {
                   onChange={(e) => handleInputChange('coaching_style', e.target.value)}
                   className="w-full mt-2 bg-slate-900/50 border border-slate-700 rounded-md text-white p-2"
                 >
-                  <option value="motivational">Motivador</option>
-                  <option value="analytical">Analítico</option>
+                  <option value="motivator">Motivador</option>
+                  <option value="technical">Técnico</option>
                   <option value="balanced">Balanceado</option>
+                  <option value="custom">Personalizado</option>
                 </select>
               </div>
             </div>
+
+            {/* Custom Coach Prompt Section */}
+            {formData.coaching_style === 'custom' && (
+              <div className="mt-6 p-4 bg-slate-900/30 rounded-lg border border-slate-600">
+                <Label className="text-slate-200 mb-2 block">
+                  Prompt Personalizado del Coach
+                </Label>
+                <p className="text-sm text-slate-400 mb-3">
+                  Define cómo quieres que sea tu coach. Describe su personalidad, tono, enfoque y estilo de comunicación.
+                </p>
+                <Textarea
+                  value={formData.custom_prompt}
+                  onChange={(e) => handleInputChange('custom_prompt', e.target.value)}
+                  placeholder="Ejemplo: Eres un coach de running que habla como un amigo cercano. Usa lenguaje casual, da consejos prácticos sin ser demasiado técnico, y siempre pregunta cómo me siento. Sé positivo pero realista."
+                  className="w-full min-h-32 bg-slate-900/50 border-slate-700 text-white placeholder:text-slate-500"
+                  maxLength={1000}
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <p className="text-xs text-slate-500">
+                    {formData.custom_prompt.length}/1000 caracteres
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const example = "Eres un coach de running que habla como un amigo cercano. Usa lenguaje casual, da consejos prácticos sin ser demasiado técnico, y siempre pregunta cómo me siento. Sé positivo pero realista.";
+                      handleInputChange('custom_prompt', example);
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 underline"
+                  >
+                    Usar ejemplo
+                  </button>
+                </div>
+                <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700 rounded-lg">
+                  <p className="text-xs text-blue-300 font-semibold mb-2">💡 Ejemplo de prompt:</p>
+                  <p className="text-xs text-blue-200 italic">
+                    "Eres un coach de running que habla como un amigo cercano. Usa lenguaje casual, da consejos prácticos sin ser demasiado técnico, y siempre pregunta cómo me siento. Sé positivo pero realista."
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

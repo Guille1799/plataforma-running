@@ -1,5 +1,5 @@
-"""
-schemas.py - Pydantic models para validación y serialización
+﻿"""
+schemas.py - Pydantic models para validaci├│n y serializaci├│n
 """
 
 from pydantic import BaseModel, EmailStr, Field, validator
@@ -28,7 +28,7 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
-    """Schema para retornar datos de usuario (sin contraseña)."""
+    """Schema para retornar datos de usuario (sin contrase├▒a)."""
 
     id: int
     name: str
@@ -125,7 +125,7 @@ class WorkoutOut(BaseModel):
 
 
 class WorkoutStats(BaseModel):
-    """Schema para estadísticas agregadas de workouts."""
+    """Schema para estad├¡sticas agregadas de workouts."""
 
     total_workouts: int
     total_distance_km: float
@@ -152,16 +152,16 @@ class RunningLevel(str, Enum):
 class CoachingStyle(str, Enum):
     """Enum para estilo de coaching."""
 
-    motivator = "motivator"  # Energético, positivo, enfocado en ánimos
-    technical = "technical"  # Analítico, basado en datos, detallado
-    balanced = "balanced"  # Mix de motivación y técnica
+    motivator = "motivator"  # Energ├⌐tico, positivo, enfocado en ├ínimos
+    technical = "technical"  # Anal├¡tico, basado en datos, detallado
+    balanced = "balanced"  # Mix de motivaci├│n y t├⌐cnica
     custom = "custom"  # Usuario define su propio prompt
 
 
 class GoalType(str, Enum):
     """Enum para tipo de objetivo."""
 
-    race = "race"  # Competencia específica
+    race = "race"  # Competencia espec├¡fica
     distance = "distance"  # Aumentar distancia
     pace = "pace"  # Mejorar pace
     frequency = "frequency"  # Aumentar frecuencia de entrenamientos
@@ -179,13 +179,13 @@ class Goal(BaseModel):
         None, description="Valor objetivo (ej: '40:00', '10K', '4x/week')"
     )
     deadline: Optional[datetime] = Field(
-        None, description="Fecha límite para el objetivo"
+        None, description="Fecha l├¡mite para el objetivo"
     )
     description: Optional[str] = Field(
-        None, max_length=500, description="Descripción adicional"
+        None, max_length=500, description="Descripci├│n adicional"
     )
     completed: bool = Field(default=False, description="Si el objetivo fue completado")
-    completed_at: Optional[datetime] = Field(None, description="Fecha de completación")
+    completed_at: Optional[datetime] = Field(None, description="Fecha de completaci├│n")
 
 
 class GoalCreate(BaseModel):
@@ -214,7 +214,7 @@ class Injury(BaseModel):
 
     date: datetime
     injury_type: str = Field(
-        ..., min_length=1, max_length=100, description="Tipo de lesión"
+        ..., min_length=1, max_length=100, description="Tipo de lesi├│n"
     )
     description: Optional[str] = Field(None, max_length=500)
     recovered: bool = Field(default=False)
@@ -225,24 +225,24 @@ class AthletePreferences(BaseModel):
     """Schema para preferencias de entrenamiento."""
 
     music: Optional[bool] = Field(
-        None, description="Prefiere música durante entrenamientos"
+        None, description="Prefiere m├║sica durante entrenamientos"
     )
     preferred_pace_range: Optional[List[float]] = Field(
         None, description="Rango de pace preferido [min, max] en min/km"
     )
     time_of_day: Optional[str] = Field(
-        None, description="Hora preferida del día (morning/afternoon/evening/night)"
+        None, description="Hora preferida del d├¡a (morning/afternoon/evening/night)"
     )
     terrain_preference: Optional[str] = Field(
         None, description="Terreno preferido (road/trail/track/mixed)"
     )
     weather_preference: Optional[str] = Field(
-        None, description="Condiciones climáticas preferidas"
+        None, description="Condiciones clim├íticas preferidas"
     )
     training_days: Optional[List[str]] = Field(
-        None, description="Días de la semana para entrenar"
+        None, description="D├¡as de la semana para entrenar"
     )
-    avoid_days: Optional[List[str]] = Field(None, description="Días a evitar")
+    avoid_days: Optional[List[str]] = Field(None, description="D├¡as a evitar")
     custom_prompt: Optional[str] = Field(
         None,
         max_length=1000,
@@ -255,7 +255,7 @@ class AthleteProfileUpdate(BaseModel):
 
     running_level: Optional[RunningLevel] = None
     max_heart_rate: Optional[int] = Field(
-        None, ge=100, le=220, description="Frecuencia cardíaca máxima"
+        None, ge=100, le=220, description="Frecuencia card├¡aca m├íxima"
     )
     coaching_style: Optional[CoachingStyle] = None
     goals: Optional[List[Goal]] = None
@@ -264,7 +264,7 @@ class AthleteProfileUpdate(BaseModel):
 
     @validator("max_heart_rate")
     def validate_max_hr(cls, v):
-        """Validar que max_heart_rate esté en rango razonable."""
+        """Validar que max_heart_rate est├⌐ en rango razonable."""
         if v is not None and (v < 100 or v > 220):
             raise ValueError("Max heart rate debe estar entre 100 y 220 bpm")
         return v
@@ -511,7 +511,7 @@ class TrainingPlanRequest(BaseModel):
 
 
 class TrainingDay(BaseModel):
-    """Schema para un día de entrenamiento."""
+    """Schema para un d├¡a de entrenamiento."""
 
     day: str
     type: str  # Easy Run, Speed Work, Long Run, Recovery, Strength, etc.
@@ -531,7 +531,7 @@ class TrainingWeek(BaseModel):
 
 
 class DurationCalculationRequest(BaseModel):
-    """Schema para calcular la duración del plan basada en la carrera objetivo."""
+    """Schema para calcular la duraci├│n del plan basada en la carrera objetivo."""
 
     target_race_date: str = Field(..., description="Fecha de la carrera (ISO format)")
     goal_type: str = Field(
@@ -562,7 +562,7 @@ class TrainingPlanResponse(BaseModel):
 
 
 class HealthMetricOut(BaseModel):
-    """Schema para retornar métricas de salud."""
+    """Schema para retornar m├⌐tricas de salud."""
 
     id: int
     user_id: int
@@ -620,7 +620,7 @@ class EventBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     location: str = Field(..., min_length=1, max_length=100)
     region: Optional[str] = Field(None, max_length=100)
-    country: str = Field(default="España", max_length=100)
+    country: str = Field(default="Espa├▒a", max_length=100)
     date: datetime
     distance_km: float = Field(..., gt=0)
     elevation_m: Optional[int] = Field(None, ge=0)
