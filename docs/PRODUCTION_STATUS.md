@@ -1,14 +1,14 @@
 # 🟢 Estado de Producción - RunCoach AI
 
-**Última actualización:** 2026-03-20 16:12:50 UTC
-**Commit:** `26433b8`
-**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/23351711988)
+**Última actualización:** 2026-03-20 17:14:11 UTC
+**Commit:** `392198d`
+**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/23354137864)
 
 ---
 
 ## 📊 Resumen
 
-✅ **Todos los servicios están operativos** (2/2)
+⚠️ **Algunos servicios tienen problemas** (1/2 operativos)
 
 ### Servicios Monitoreados
 
@@ -18,17 +18,16 @@
 - **Health Check:** https://plataforma-running.vercel.app
 - **Estado:** `healthy`
 - **Status Code:** `200`
-- **Response Time:** `213.52ms`
-- **Timestamp:** 2026-03-20T16:12:49.357858
+- **Response Time:** `659.49ms`
+- **Timestamp:** 2026-03-20T17:13:55.467632
 
-#### ✅ Backend API (Render)
+#### ❌ Backend API (Render)
 
 - **URL:** https://plataforma-running.onrender.com
 - **Health Check:** https://plataforma-running.onrender.com/health
-- **Estado:** `healthy`
-- **Status Code:** `200`
-- **Response Time:** `421.99ms`
-- **Timestamp:** 2026-03-20T16:12:50.003903
+- **Estado:** `timeout`
+- **Error:** `Timeout después de 15 segundos`
+- **Timestamp:** 2026-03-20T17:13:56.798097
 
 ---
 
@@ -42,21 +41,21 @@
     "health_endpoint": "https://plataforma-running.vercel.app",
     "status": "healthy",
     "status_code": 200,
-    "response_time_ms": 213.52,
+    "response_time_ms": 659.49,
     "error": null,
-    "timestamp": "2026-03-20T16:12:49.357858",
+    "timestamp": "2026-03-20T17:13:55.467632",
     "healthy": true
   },
   {
     "name": "Backend API (Render)",
     "url": "https://plataforma-running.onrender.com",
     "health_endpoint": "https://plataforma-running.onrender.com/health",
-    "status": "healthy",
-    "status_code": 200,
-    "response_time_ms": 421.99,
-    "error": null,
-    "timestamp": "2026-03-20T16:12:50.003903",
-    "healthy": true
+    "status": "timeout",
+    "status_code": null,
+    "response_time_ms": null,
+    "error": "Timeout después de 15 segundos",
+    "timestamp": "2026-03-20T17:13:56.798097",
+    "healthy": false
   }
 ]
 ```
