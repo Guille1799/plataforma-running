@@ -18,4 +18,5 @@ Recorded state at that run: **1/2 services healthy**
 ## Notes
 
 - Render free-tier services may sleep when idle, causing timeout warnings.
+- A timeout in this file does not necessarily mean the backend is broken; it can be a normal cold-start condition.
 - For current status, open the latest workflow run in GitHub Actions.
