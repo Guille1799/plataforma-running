@@ -1,36 +1,44 @@
-# 🚀 Guía de Inicio Rápido
+# Quick Start Guide
 
-Hemos simplificado el proceso de arranque para usar **Docker** (backend) y **Next.js** (frontend) de forma robusta.
+We simplified startup to run **Docker** (backend stack) and **Next.js** (frontend) with a reliable local flow.
 
-## 1. Iniciar la Plataforma (`start-dev.bat`)
+## 1. Start the platform (`start-dev.ps1`)
 
-Simplemente haz doble clic en el archivo `start-dev.bat` en la carpeta del proyecto.
+Run the PowerShell script `start-dev.ps1` from the project root:
 
-Este script:
-1. Levanta el Backend, Base de Datos y Redis usando Docker.
-2. Espera 10 segundos a que todo esté listo.
-3. Abre una nueva ventana negra para el Frontend.
+```powershell
+.\start-dev.ps1
+```
 
-**URLs Importantes:**
+This script:
+1. Starts Backend, Database, and Redis with Docker.
+2. Polls `http://localhost:8000/health` until backend is ready.
+3. Opens a new terminal window for Frontend.
+
+**Important URLs:**
 - **Frontend:** http://localhost:3000
 - **Backend API:** http://localhost:8000/docs
 
-## 2. Detener la Plataforma (`stop-dev.bat`)
+## 2. Stop the platform (`stop-dev.ps1`)
 
-Para apagar todo correctamente:
-1. Cierra la ventana negra del Frontend.
-2. Haz doble clic en `stop-dev.bat`.
+To shut everything down correctly:
+1. Close the Frontend terminal window.
+2. Run the PowerShell script:
 
-Esto detendrá los contenedores de Docker para liberar memoria.
+```powershell
+.\stop-dev.ps1
+```
+
+This stops Docker containers and frees resources.
 
 ---
 
-### Solución de Problemas
+### Troubleshooting
 
-**Si el backend falla:**
-- Asegúrate de que Docker Desktop esté abierto y el icono de la ballena esté visible.
-- Ejecuta `docker ps` en una terminal para ver si los contenedores `runcoach_backend`, `runcoach_db` y `runcoach_redis` están corriendo.
+**If backend fails:**
+- Make sure Docker Desktop is running.
+- Run `docker ps` to verify containers `runcoach_backend`, `runcoach_db`, `runcoach_redis`, `runcoach_celery_worker`, and `runcoach_celery_beat` are up.
 
-**Si el frontend falla:**
-- Verifica que no tengas otra cosa corriendo en el puerto 3000.
-- En la ventana del frontend, busca errores de compilación.
+**If frontend fails:**
+- Ensure port 3000 is not already in use.
+- Check frontend terminal logs for build/runtime errors.
