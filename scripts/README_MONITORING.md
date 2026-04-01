@@ -1,31 +1,29 @@
-# 🔍 Sistema de Monitoreo - Guía Rápida
+# Monitoring Script - Quick Reference
 
-## Uso Básico
+## Basic usage
 
 ```powershell
-# Monitoreo simple (una vez)
 .\scripts\production-monitor.ps1
+```
 
-# Monitoreo continuo (cada 60 segundos)
+Continuous mode:
+
+```powershell
 .\scripts\production-monitor.ps1 -Continuous
+```
 
-# Monitoreo cada 30 segundos
+Custom interval:
+
+```powershell
 .\scripts\production-monitor.ps1 -Continuous -IntervalSeconds 30
 ```
 
-## Qué Hace
+## What it does
 
-1. Verifica que el Frontend (Vercel) responda
-2. Verifica que el Backend (Render) responda en `/health`
-3. Muestra tiempos de respuesta
-4. Detecta errores automáticamente
-5. Genera reportes en `monitoring-report-*.txt`
+1. Checks Frontend (Vercel)
+2. Checks Backend (Render `/health`)
+3. Measures response times
+4. Reports failures and warnings
+5. Generates text reports (`monitoring-report-*.txt`)
 
-## Resultados
-
-- ✅ **healthy**: Servicio operativo
-- ❌ **error/timeout/unreachable**: Problema detectado
-
-## Ver Documentación Completa
-
-Ver: `docs/MONITORING_GUIDE.md`
+Full documentation: [`../docs/MONITORING_GUIDE.md`](../docs/MONITORING_GUIDE.md)

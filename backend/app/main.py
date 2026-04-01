@@ -81,7 +81,8 @@ if settings.environment == "production" and (not settings.secret_key or not sett
 #   - Never use create_all() in production
 #   - Run migrations BEFORE starting the server
 # Database schema is managed exclusively through Alembic migrations
-# Migrations are automatically run in Docker via docker-compose.dev.yml
+# Migrations are NOT automatically run by docker-compose.dev.yml startup
+# Apply migrations explicitly (e.g., docker exec runcoach_backend python -m alembic upgrade head)
 # For local development: Run 'cd backend && alembic upgrade head' manually
 logger.info("Database schema managed via Alembic migrations")
 logger.info("Migrations should be applied before starting the server")

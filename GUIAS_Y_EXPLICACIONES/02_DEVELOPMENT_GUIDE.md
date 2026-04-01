@@ -4,4 +4,4 @@ This file is preserved for compatibility only.
 
 Use the maintained English guide:
 
-- [`../docs/guides/FEATURES_AND_WORKFLOWS.md`](../docs/guides/FEATURES_AND_WORKFLOWS.md)
+- [`../docs/guides/DEVELOPMENT_GUIDE.md`](../docs/guides/DEVELOPMENT_GUIDE.md)
