@@ -143,41 +143,61 @@ def connect_user_garmin(
     return user
 
 
-def _oauth_tokens_valid(token_dir: str) -> bool:
-    """Return True if both OAuth token files exist and are non-empty."""
-    required = ["oauth1_token.json", "oauth2_token.json"]
-    for fname in required:
-        path = os.path.join(token_dir, fname)
-        if not os.path.exists(path) or os.path.getsize(path) == 0:
-            return False
-    return True
+def _write_tokens_to_dir(token_dir: str, oauth1: str, oauth2: str) -> None:
+    """Write OAuth token strings to files in token_dir."""
+    os.makedirs(token_dir, exist_ok=True)
+    with open(os.path.join(token_dir, "oauth1_token.json"), "w") as f:
+        f.write(oauth1)
+    with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
+        f.write(oauth2)
+
+
+def _read_tokens_from_dir(token_dir: str):
+    """Return (oauth1_str, oauth2_str) or (None, None) if files are missing/empty."""
+    try:
+        p1 = os.path.join(token_dir, "oauth1_token.json")
+        p2 = os.path.join(token_dir, "oauth2_token.json")
+        if not os.path.exists(p1) or not os.path.exists(p2):
+            return None, None
+        with open(p1) as f:
+            oauth1 = f.read().strip()
+        with open(p2) as f:
+            oauth2 = f.read().strip()
+        if not oauth1 or not oauth2:
+            return None, None
+        return oauth1, oauth2
+    except Exception:
+        return None, None
+
+
+def _save_tokens_to_db(db: Session, user, credentials: dict, token_dir: str) -> None:
+    """Persist OAuth tokens from token_dir into the encrypted DB field."""
+    oauth1, oauth2 = _read_tokens_from_dir(token_dir)
+    if oauth1 and oauth2:
+        credentials["oauth1_token"] = oauth1
+        credentials["oauth2_token"] = oauth2
+        user.garmin_token = encrypt_token(json.dumps(credentials))
+        db.commit()
+        logger.info("[GARMIN] OAuth tokens saved to DB", extra={"user_id": user.id})
 
 
 def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     """
     Get authenticated Garmin API for a user.
 
-    Reuses saved OAuth tokens when available to avoid triggering Garmin
-    rate-limits (HTTP 429) from repeated full SSO logins.  Falls back to
-    a fresh garth.login() only when tokens are missing or the resumption
-    fails, then persists the new tokens for next time.
+    Token priority (to avoid Garmin 429 rate-limits):
+      1. OAuth tokens stored in DB (survive Render restarts)
+      2. OAuth token files on disk  (same container run)
+      3. Full garth.login() with email+password (last resort)
 
-    Args:
-        db: Database session
-        user_id: User ID
-
-    Returns:
-        Authenticated GarminConnectAPI instance
-
-    Raises:
-        Exception: If user not connected or credentials invalid
+    After any full login the new tokens are saved both to disk and DB
+    so subsequent calls within the same session and after restarts are fast.
     """
     user = crud.get_user_by_id(db, user_id)
 
     if not user.garmin_token or not user.garmin_email:
         raise Exception("User has not connected Garmin account")
 
-    # Decrypt credentials (needed for fallback re-login)
     credentials_json = decrypt_token(user.garmin_token)
     credentials = json.loads(credentials_json)
     email = credentials["email"]
@@ -188,34 +208,57 @@ def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     token_dir = os.path.join("/app/garmin_tokens", f"user_{user_id}")
     os.makedirs(token_dir, exist_ok=True)
 
-    # --- Try to resume an existing session first ---
-    if _oauth_tokens_valid(token_dir):
+    # --- 1. Try tokens stored in DB (survive container restarts) ---
+    db_oauth1 = credentials.get("oauth1_token")
+    db_oauth2 = credentials.get("oauth2_token")
+    if db_oauth1 and db_oauth2:
         try:
-            logger.info(f"[GARMIN] Resuming session from {token_dir}", extra={"user_id": user_id})
+            logger.info("[GARMIN] Trying OAuth tokens from DB", extra={"user_id": user_id})
+            _write_tokens_to_dir(token_dir, db_oauth1, db_oauth2)
             garth.resume(token_dir)
             api = GarminConnectAPI()
-            # Quick probe to verify the session is still live
-            api.get_full_name()
-            logger.info("[GARMIN] Session resumed successfully", extra={"user_id": user_id})
+            api.get_full_name()  # Verify session is live
+            logger.info("[GARMIN] Session resumed from DB tokens", extra={"user_id": user_id})
             return api
-        except Exception as resume_err:
+        except Exception as e:
             logger.warning(
-                f"[GARMIN] Session resume failed ({resume_err}), falling back to full login",
+                f"[GARMIN] DB token resume failed ({e}), trying disk tokens",
                 extra={"user_id": user_id},
             )
 
-    # --- Full login fallback ---
+    # --- 2. Try OAuth token files already on disk ---
+    disk_oauth1, disk_oauth2 = _read_tokens_from_dir(token_dir)
+    if disk_oauth1 and disk_oauth2 and not (disk_oauth1 == db_oauth1 and disk_oauth2 == db_oauth2):
+        try:
+            logger.info("[GARMIN] Trying OAuth tokens from disk", extra={"user_id": user_id})
+            garth.resume(token_dir)
+            api = GarminConnectAPI()
+            api.get_full_name()
+            logger.info("[GARMIN] Session resumed from disk tokens", extra={"user_id": user_id})
+            # Promote disk tokens to DB so they survive next restart
+            _save_tokens_to_db(db, user, credentials, token_dir)
+            return api
+        except Exception as e:
+            logger.warning(
+                f"[GARMIN] Disk token resume failed ({e}), falling back to full login",
+                extra={"user_id": user_id},
+            )
+
+    # --- 3. Full login fallback ---
     logger.info("[GARMIN] Performing full garth.login()", extra={"user_id": user_id})
     garth.login(email, password)
 
-    # Persist the new OAuth tokens, keeping only the two required files
+    # Save new tokens to disk and DB
     garth.save(token_dir)
+    # Remove non-OAuth files (security)
     allowed_files = {"oauth1_token.json", "oauth2_token.json"}
     for filename in os.listdir(token_dir):
         if filename not in allowed_files:
             os.remove(os.path.join(token_dir, filename))
 
-    logger.info("[GARMIN] Full login successful, tokens saved", extra={"user_id": user_id})
+    _save_tokens_to_db(db, user, credentials, token_dir)
+
+    logger.info("[GARMIN] Full login complete, tokens persisted to DB", extra={"user_id": user_id})
     api = GarminConnectAPI()
     return api
 
