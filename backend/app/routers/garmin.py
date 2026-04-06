@@ -16,6 +16,33 @@ from ..dependencies.auth import get_current_user
 router = APIRouter(prefix="/api/v1/garmin")
 
 
+def _garmin_http_error(exc: Exception, operation: str) -> HTTPException:
+    """Map Garmin/garth exceptions to appropriate HTTP status codes."""
+    msg = str(exc).lower()
+    if "429" in msg or "too many requests" in msg or "rate limit" in msg:
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Garmin is rate-limiting requests. "
+                "Wait a few minutes and try again."
+            ),
+        )
+    if "401" in msg or "unauthorized" in msg or "invalid credentials" in msg or "login" in msg:
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Garmin credentials. Reconnect your account.",
+        )
+    if "not connected" in msg:
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Garmin account not connected. Connect your account first.",
+        )
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Garmin {operation} failed: {str(exc)}",
+    )
+
+
 class GarminConnectRequest(BaseModel):
     """Request to connect Garmin account."""
     email: EmailStr
@@ -61,10 +88,7 @@ def connect_garmin(
             "connected_at": user.garmin_connected_at.isoformat()
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to connect Garmin: {str(e)}"
-        )
+        raise _garmin_http_error(e, "connect")
 
 
 @router.post("/sync", status_code=200)
@@ -118,10 +142,7 @@ def sync_activities(
         import logging
         logger = logging.getLogger(__name__)
         logger.error(f"Garmin sync failed for user {current_user.id}: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Sync failed: {str(e)}"
-        )
+        raise _garmin_http_error(e, "sync")
 
 
 @router.get("/status", response_model=GarminStatusResponse)

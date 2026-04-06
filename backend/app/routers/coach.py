@@ -129,7 +129,7 @@ def get_hr_zones(
     return {
         "max_heart_rate": max_hr,
         "zones": zones,
-        "note": "Estas zonas son estimaciones. Ajusta según tu percepción de esfuerzo."
+        "note": "These zones are estimates. Adjust based on your perceived exertion."
     }
 
 

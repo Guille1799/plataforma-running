@@ -830,10 +830,10 @@ def get_adapted_workout(
             "original_workout": original_workout,
             "adapted_workout": {
                 "type": "rest_day",
-                "name": "Día de descanso (Recomendado por salud)",
+                "name": "Rest day (Recommended for health)",
                 "distance_km": 0,
                 "pace_target": "N/A",
-                "notes": "Necesitas descanso. Recuperarte hoy es entrenar mañana."
+                "notes": "You need rest. Recovering today is training for tomorrow."
             },
             "should_rest": True,
             "recommendation": coaching_service.get_recovery_recommendation(health_data)

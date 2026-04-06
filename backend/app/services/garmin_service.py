@@ -143,10 +143,24 @@ def connect_user_garmin(
     return user
 
 
+def _oauth_tokens_valid(token_dir: str) -> bool:
+    """Return True if both OAuth token files exist and are non-empty."""
+    required = ["oauth1_token.json", "oauth2_token.json"]
+    for fname in required:
+        path = os.path.join(token_dir, fname)
+        if not os.path.exists(path) or os.path.getsize(path) == 0:
+            return False
+    return True
+
+
 def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     """
     Get authenticated Garmin API for a user.
-    Creates Garmin instance and calls .login() explicitly.
+
+    Reuses saved OAuth tokens when available to avoid triggering Garmin
+    rate-limits (HTTP 429) from repeated full SSO logins.  Falls back to
+    a fresh garth.login() only when tokens are missing or the resumption
+    fails, then persists the new tokens for next time.
 
     Args:
         db: Database session
@@ -163,52 +177,46 @@ def get_user_garmin_api(db: Session, user_id: int) -> GarminConnectAPI:
     if not user.garmin_token or not user.garmin_email:
         raise Exception("User has not connected Garmin account")
 
-    # Decrypt credentials
+    # Decrypt credentials (needed for fallback re-login)
     credentials_json = decrypt_token(user.garmin_token)
     credentials = json.loads(credentials_json)
-
     email = credentials["email"]
     password = credentials["password"]
 
-    print(f"[GARMIN] Creating Garmin() with credentials")
+    garth.configure(timeout=120, domain="garmin.com")
 
-    # Configure garth with longer timeout for large syncs (2 years of data)
-    garth.configure(timeout=120)
+    token_dir = os.path.join("/app/garmin_tokens", f"user_{user_id}")
+    os.makedirs(token_dir, exist_ok=True)
 
-    # Use garth directly to ensure session is saved correctly
-    print(f"[GARMIN] Logging in with garth...")
+    # --- Try to resume an existing session first ---
+    if _oauth_tokens_valid(token_dir):
+        try:
+            logger.info(f"[GARMIN] Resuming session from {token_dir}", extra={"user_id": user_id})
+            garth.resume(token_dir)
+            api = GarminConnectAPI()
+            # Quick probe to verify the session is still live
+            api.get_full_name()
+            logger.info("[GARMIN] Session resumed successfully", extra={"user_id": user_id})
+            return api
+        except Exception as resume_err:
+            logger.warning(
+                f"[GARMIN] Session resume failed ({resume_err}), falling back to full login",
+                extra={"user_id": user_id},
+            )
+
+    # --- Full login fallback ---
+    logger.info("[GARMIN] Performing full garth.login()", extra={"user_id": user_id})
     garth.login(email, password)
-    garth.configure(domain="garmin.com")
 
-    print(f"[GARMIN] Login successful")
-
-    # Save OAuth tokens to persistent directory for Celery workers
-    persistent_dir = "/app/garmin_tokens"
-    user_token_dir = os.path.join(persistent_dir, f"user_{user_id}")
-    os.makedirs(user_token_dir, exist_ok=True)
-
-    # Save garth session directly to user's persistent directory
-    print(f"[GARMIN] Saving session to {user_token_dir}")
-    garth.save(user_token_dir)
-
-    # Remove email/password files for security (keep only OAuth tokens)
-    import shutil
-
-    allowed_files = ["oauth1_token.json", "oauth2_token.json"]
-    for filename in os.listdir(user_token_dir):
+    # Persist the new OAuth tokens, keeping only the two required files
+    garth.save(token_dir)
+    allowed_files = {"oauth1_token.json", "oauth2_token.json"}
+    for filename in os.listdir(token_dir):
         if filename not in allowed_files:
-            file_path = os.path.join(user_token_dir, filename)
-            os.remove(file_path)
-            print(f"[GARMIN] Removed {filename} for security")
-        else:
-            # Verify file has content
-            file_path = os.path.join(user_token_dir, filename)
-            size = os.path.getsize(file_path)
-            print(f"[GARMIN] Kept {filename} ({size} bytes)")
+            os.remove(os.path.join(token_dir, filename))
 
-    # Now create GarminConnectAPI using the authenticated garth session
+    logger.info("[GARMIN] Full login successful, tokens saved", extra={"user_id": user_id})
     api = GarminConnectAPI()
-
     return api
 
 
@@ -529,18 +537,9 @@ def sync_user_zones_and_profile(
         except Exception as e:
             print(f"[ZONES] Error fetching HR zones: {e}")
 
-        # Try to get power zones
-        print("[ZONES] Fetching power zones...")
+        # Power zones: get_user_settings() does not exist in garminconnect library,
+        # so we skip this section — power zones are rarely available via Connect anyway.
         power_zones = []
-        try:
-            # Power zones are typically trainer/power meter specific
-            # Try to fetch from settings
-            settings = api.get_user_settings()
-            if "powerZones" in settings:
-                power_zones = settings["powerZones"]
-                print(f"[ZONES] Power zones found: {power_zones}")
-        except Exception as e:
-            print(f"[ZONES] Power zones not available: {e}")
 
         if power_zones:
             user.power_zones = power_zones
@@ -717,7 +716,7 @@ def sync_garmin_activities(db: Session, user_id: int) -> List[models.Workout]:
         print("[SYNC] API obtained successfully")
 
         # Sync user profile data (HR zones, etc.) first
-        sync_user_profile_data(db, user_id, api)
+        sync_user_zones_and_profile(db, user_id, api)
 
         # Determine date range for fetching activities
         user = crud.get_user_by_id(db, user_id)

@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check auth status on mount
+  // Check auth status on mount — hydrates user + profile from stored token
   useEffect(() => {
     const token = apiClient.getToken();
 
@@ -39,15 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Try to fetch onboarding status
-    const checkOnboarding = async () => {
+    const checkAuth = async () => {
       try {
-        const profile = await apiClient.getOnboardingStatus();
+        // Hydrate user so isAuthenticated is correct immediately
+        const [userData, profile] = await Promise.all([
+          apiClient.getCurrentUser(),
+          apiClient.getOnboardingStatus(),
+        ]);
+
+        if (userData) setUser(userData);
+
         if (profile) {
           setUserProfile(profile);
           setOnboardingCompleted(profile.onboarding_completed || false);
 
-          // If on auth pages and authenticated, redirect based on onboarding status
           if (pathname === '/login' || pathname === '/register') {
             if (profile.onboarding_completed) {
               router.push('/dashboard');
@@ -57,15 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch onboarding status:', error);
-        // Don't fail silently - allow user to continue
+        console.error('Failed to restore session:', error);
         setOnboardingCompleted(false);
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkOnboarding();
+    checkAuth();
   }, [pathname, router]);
 
   // Protect onboarding route
@@ -96,25 +100,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await apiClient.login(credentials);
       setUser(response.user);
 
-      // Check onboarding status (pero no bloquear si falla)
       try {
         const profile = await apiClient.getOnboardingStatus();
         if (profile) {
           setUserProfile(profile);
           setOnboardingCompleted(profile.onboarding_completed || false);
-
+          setIsLoading(false);
           if (profile.onboarding_completed) {
             router.push('/dashboard');
           } else {
             router.push('/onboarding');
           }
         } else {
-          // Profile es null/undefined, ir al dashboard de todas formas
+          setIsLoading(false);
           router.push('/dashboard');
         }
       } catch (error) {
         console.error('Failed to fetch profile after login:', error);
-        // No dejes que esto bloquee - simplemente ve al dashboard
+        setIsLoading(false);
         router.push('/dashboard');
       }
     } catch (error) {
@@ -128,7 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await apiClient.register(data);
       setUser(response.user);
-      setOnboardingCompleted(false); // New users need onboarding
+      setOnboardingCompleted(false);
+      setIsLoading(false);
       router.push('/onboarding');
     } catch (error) {
       setIsLoading(false);

@@ -152,20 +152,20 @@ export default function WorkoutsPage() {
       <Card className="bg-slate-900 border-slate-800 mb-8 p-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Buscar</label>
+            <label className="text-sm text-slate-400 mb-2 block">Search</label>
             <Input
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value)
                 setCurrentPage(1)
               }}
-              placeholder="Tipo de deporte..."
+              placeholder="Sport type..."
               className="bg-slate-800 border-slate-700"
             />
           </div>
 
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Tipo</label>
+            <label className="text-sm text-slate-400 mb-2 block">Type</label>
             <select
               value={sportFilter}
               onChange={(e) => {
@@ -174,7 +174,7 @@ export default function WorkoutsPage() {
               }}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-200 text-sm"
             >
-              <option value="all">Todos</option>
+              <option value="all">All</option>
               {getSportTypes().map((type) => (
                 <option key={type} value={type}>
                   {type}
@@ -184,7 +184,7 @@ export default function WorkoutsPage() {
           </div>
 
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Desde</label>
+            <label className="text-sm text-slate-400 mb-2 block">From</label>
             <Input
               type="date"
               value={dateFrom}
@@ -197,7 +197,7 @@ export default function WorkoutsPage() {
           </div>
 
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Hasta</label>
+            <label className="text-sm text-slate-400 mb-2 block">To</label>
             <Input
               type="date"
               value={dateTo}
@@ -210,7 +210,7 @@ export default function WorkoutsPage() {
           </div>
 
           <div>
-            <label className="text-sm text-slate-400 mb-2 block">Ordenar por</label>
+            <label className="text-sm text-slate-400 mb-2 block">Sort by</label>
             <select
               value={sortBy}
               onChange={(e) => {
@@ -219,12 +219,12 @@ export default function WorkoutsPage() {
               }}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-200 text-sm"
             >
-              <option value="date-desc">Más reciente</option>
-              <option value="date-asc">Más antiguo</option>
-              <option value="distance-desc">Mayor distancia</option>
-              <option value="distance-asc">Menor distancia</option>
-              <option value="pace-asc">Ritmo más rápido</option>
-              <option value="pace-desc">Ritmo más lento</option>
+              <option value="date-desc">Newest first</option>
+              <option value="date-asc">Oldest first</option>
+              <option value="distance-desc">Longest distance</option>
+              <option value="distance-asc">Shortest distance</option>
+              <option value="pace-asc">Fastest pace</option>
+              <option value="pace-desc">Slowest pace</option>
             </select>
           </div>
         </div>
@@ -234,21 +234,21 @@ export default function WorkoutsPage() {
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-pulse">
-            <p className="text-slate-400">Cargando entrenamientos...</p>
+            <p className="text-slate-400">Loading workouts...</p>
           </div>
         </div>
       ) : error ? (
         <Card className="bg-slate-900 border-slate-800 p-6">
           <p className="text-red-400">{error}</p>
           <Button onClick={loadWorkouts} className="mt-4 bg-blue-600">
-            Reintentar
+            Retry
           </Button>
         </Card>
       ) : filteredWorkouts.length === 0 ? (
         <Card className="bg-slate-900 border-slate-800 p-12 text-center">
           <Activity className="w-12 h-12 mx-auto mb-4 opacity-50 text-slate-600" />
-          <p className="text-slate-400 mb-4">No hay entrenamientos para mostrar</p>
-          <Button className="bg-blue-600">Sincronizar Garmin</Button>
+          <p className="text-slate-400 mb-4">No workouts to show</p>
+          <Button className="bg-blue-600">Sync Garmin</Button>
         </Card>
       ) : (
         <>
@@ -276,25 +276,25 @@ export default function WorkoutsPage() {
                       {/* Right */}
                       <div className="grid grid-cols-4 gap-8 text-right">
                         <div>
-                          <p className="text-xs text-slate-500 mb-1">Distancia</p>
+                          <p className="text-xs text-slate-500 mb-1">Distance</p>
                           <p className="text-lg font-semibold text-white">
                             {formatDistance(workout.distance_meters || 0)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500 mb-1">Ritmo</p>
+                          <p className="text-xs text-slate-500 mb-1">Pace</p>
                           <p className="text-lg font-semibold text-white">
                             {formatPace(workout.avg_pace || 0)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500 mb-1">FC Promedio</p>
+                          <p className="text-xs text-slate-500 mb-1">Avg HR</p>
                           <p className="text-lg font-semibold text-white">
                             {workout.avg_heart_rate ? `${Math.round(workout.avg_heart_rate)} bpm` : '-'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-slate-500 mb-1">Duración</p>
+                          <p className="text-xs text-slate-500 mb-1">Duration</p>
                           <p className="text-lg font-semibold text-white">
                             {formatDuration(workout.duration_seconds || 0)}
                           </p>
@@ -316,10 +316,10 @@ export default function WorkoutsPage() {
                 variant="outline"
                 className="border-slate-700"
               >
-                Anterior
+                Previous
               </Button>
               <span className="text-slate-400">
-                Página {currentPage} de {totalPages}
+                Page {currentPage} of {totalPages}
               </span>
               <Button
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
@@ -327,7 +327,7 @@ export default function WorkoutsPage() {
                 variant="outline"
                 className="border-slate-700"
               >
-                Siguiente
+                Next
               </Button>
             </div>
           )}
