@@ -35,6 +35,12 @@ export function useAutoSync(forceOnMount: boolean = true) {
             return;
         }
 
+        // Never sync without a JWT — avoids triggering the token-refresh loop
+        if (!localStorage.getItem('auth_token')) {
+            console.log('[AutoSync] No auth token, skipping sync');
+            return;
+        }
+
         if (!force && !shouldSync()) {
             console.log('[AutoSync] Last sync was recent, skipping');
             return;
@@ -66,13 +72,18 @@ export function useAutoSync(forceOnMount: boolean = true) {
                 console.log('[AutoSync] No new workouts to sync');
             }
         } catch (error: any) {
+            const status = error.response?.status;
             console.warn('[AutoSync] Failed to sync:', error.message);
 
-            // If it's a 401 (not authenticated), don't retry soon
-            if (error.response?.status === 401) {
-                console.log('[AutoSync] Not authenticated, will not auto-sync again');
-                localStorage.setItem(STORAGE_KEY, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+            if (status === 401) {
+                // Token expired or missing — just skip, don't block future syncs.
+                // The auth interceptor will handle redirect to /login if needed.
+                console.log('[AutoSync] Not authenticated — skipping sync, will retry on next mount.');
+            } else if (status === 429) {
+                // Garmin rate-limit — back off for 30 minutes
+                localStorage.setItem(STORAGE_KEY, new Date(Date.now() + 30 * 60 * 1000).toISOString());
             }
+            // Any other error: do not update lastSync, so next check retries normally
         } finally {
             syncingRef.current = false;
             setIsSyncing(false);
@@ -82,9 +93,10 @@ export function useAutoSync(forceOnMount: boolean = true) {
     };
 
     useEffect(() => {
-        // Always sync on mount (on login)
+        // Delay the first sync by 2 s to let the auth context hydrate the token
+        let mountTimer: ReturnType<typeof setTimeout>;
         if (forceOnMount) {
-            performSync(true);
+            mountTimer = setTimeout(() => performSync(true), 2000);
         }
 
         // Set up interval to check periodically (every 30 minutes)
@@ -93,6 +105,7 @@ export function useAutoSync(forceOnMount: boolean = true) {
         }, 30 * 60 * 1000);
 
         return () => {
+            clearTimeout(mountTimer);
             clearInterval(checkInterval);
         };
     }, []);
