@@ -16,18 +16,27 @@ from ..dependencies.auth import get_current_user
 router = APIRouter(prefix="/api/v1/garmin")
 
 
+import logging as _logging
+_router_logger = _logging.getLogger(__name__)
+
+
 def _garmin_http_error(exc: Exception, operation: str) -> HTTPException:
     """Map Garmin/garth exceptions to appropriate HTTP status codes."""
-    msg = str(exc).lower()
+    # Use repr() as fallback so we always have something human-readable
+    exc_str = str(exc) or repr(exc) or exc.__class__.__name__
+    msg = exc_str.lower()
+
+    _router_logger.error(
+        "Garmin %s error: %s (%s)", operation, exc_str, exc.__class__.__name__,
+        exc_info=True,
+    )
+
     if "429" in msg or "too many requests" in msg or "rate limit" in msg:
         return HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                "Garmin is rate-limiting requests. "
-                "Wait a few minutes and try again."
-            ),
+            detail="Garmin is rate-limiting requests. Wait a few minutes and try again.",
         )
-    if "401" in msg or "unauthorized" in msg or "invalid credentials" in msg or "login" in msg:
+    if "401" in msg or "unauthorized" in msg or "invalid credentials" in msg:
         return HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Garmin credentials. Reconnect your account.",
@@ -37,10 +46,22 @@ def _garmin_http_error(exc: Exception, operation: str) -> HTTPException:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Garmin account not connected. Connect your account first.",
         )
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Garmin {operation} failed: {str(exc)}",
-    )
+    if "login" in msg or "sso" in msg or "signon" in msg or "authentication" in msg:
+        return HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Garmin login failed — this is usually a temporary rate-limit. "
+                "Wait 10–15 minutes and try again."
+            ),
+        )
+    if "timeout" in msg or "timed out" in msg:
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Garmin request timed out. Try again in a moment.",
+        )
+    # Generic fallback — always include the class name so it's not empty
+    detail = f"Garmin {operation} failed: {exc_str}" if exc_str else f"Garmin {operation} failed (unknown error: {exc.__class__.__name__})"
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 
 class GarminConnectRequest(BaseModel):
