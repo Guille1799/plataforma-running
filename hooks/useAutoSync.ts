@@ -93,10 +93,15 @@ export function useAutoSync(forceOnMount: boolean = true) {
     };
 
     useEffect(() => {
-        // Delay the first sync by 2 s to let the auth context hydrate the token
+        // Only auto-sync on mount if there is evidence of a previous successful sync.
+        // Never auto-sync on first login (no lastGarminSync key) — the user must trigger
+        // their first sync manually from the Garmin page to avoid rate-limit storms.
+        const hasPreviousSync = Boolean(localStorage.getItem(STORAGE_KEY));
+
         let mountTimer: ReturnType<typeof setTimeout>;
-        if (forceOnMount) {
-            mountTimer = setTimeout(() => performSync(true), 2000);
+        if (forceOnMount && hasPreviousSync) {
+            // Small delay to let the auth context hydrate the token
+            mountTimer = setTimeout(() => performSync(true), 3000);
         }
 
         // Set up interval to check periodically (every 30 minutes)
