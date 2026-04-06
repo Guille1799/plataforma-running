@@ -64,3 +64,4 @@
 
 *Este archivo se actualiza automáticamente después de cada push a `main`*
 *Para verificar manualmente: `.\scripts\production-monitor.ps1`*
+*Nota: En planes gratuitos, un `timeout` puede deberse a cold start tras inactividad y no necesariamente a una caída real del servicio.*

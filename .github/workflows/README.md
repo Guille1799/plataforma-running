@@ -1,25 +1,27 @@
-# GitHub Actions Workflows
+# GitHub Workflows
 
-Este directorio contiene los workflows de CI/CD para el proyecto RunCoach AI.
+This directory contains CI and monitoring workflows for RunCoach AI.
 
-## 🟢 Monitor Production
+## `tests.yml` (Quality checks)
 
-**Archivo:** `monitor-production.yml`
+Runs on push/PR to `main` and `develop` (with path filters).
 
-**Cuándo se ejecuta:**
-- Automáticamente después de cada push a `main`
-- Manualmente desde GitHub Actions UI (botón "Run workflow")
+Jobs:
+- **backend-tests**: Python 3.11, install test dependencies, run `pytest`.
+- **frontend-quality**: Node 20, run `npm ci`, `npm run lint`, `npm run typecheck`, and `npm run build`.
 
-**Qué hace:**
-1. Verifica que el Frontend (Vercel) esté operativo
-2. Verifica que el Backend (Render) esté operativo en `/health`
-3. Reporta el estado de cada servicio
-4. Falla el workflow si algún servicio no está operativo
+## `monitor-production.yml` (Production monitoring)
 
-**Costo:**
-- ✅ Completamente gratis (usa 2000 minutos/mes gratuitos de GitHub Actions)
+Runs on:
+- Push to `main`
+- Manual workflow dispatch
+- Hourly cron schedule
 
-**Ver resultados:**
-- Ve a: https://github.com/Guille1799/plataforma-running/actions
-- Busca el workflow "🟢 Monitor Production"
-- Revisa los logs de cada ejecución
+Behavior:
+- Checks frontend (Vercel) and backend (Render `/health`).
+- Writes `docs/PRODUCTION_STATUS.md`.
+- On scheduled runs, commits updated status.
+- Can open/update GitHub issues when failures are detected.
+
+View runs:
+- [GitHub Actions](https://github.com/Guille1799/plataforma-running/actions)
