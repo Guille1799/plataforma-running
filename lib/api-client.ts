@@ -64,7 +64,15 @@ class APIClient {
         const originalRequest = error.config as InternalAxiosRequestConfig | undefined;
         
         // Only handle 401 errors (Unauthorized)
+        // IMPORTANTE: No intentar refrescar token en endpoints de autenticación (login, register)
         if (error.response?.status === 401 && originalRequest) {
+          // No intentar refrescar en endpoints de auth - estos son errores legítimos de credenciales
+          if (originalRequest.url?.includes('/api/v1/auth/login') || 
+              originalRequest.url?.includes('/api/v1/auth/register')) {
+            // Es un error de login/register, no intentar refrescar
+            return Promise.reject(error);
+          }
+          
           // Check if this request was already retried to avoid infinite loops
           const retryCount = (originalRequest as any)._retryCount || 0;
           if (retryCount > 0) {
@@ -211,9 +219,18 @@ class APIClient {
   // ============================================================================
 
   async login(credentials: LoginRequest): Promise<AuthResponse> {
+    console.log('[API] Login request starting...');
     const response = await this.client.post<AuthResponse>('/api/v1/auth/login', credentials);
+    console.log('[API] Login response received, setting tokens...');
     this.setToken(response.data.access_token);
     this.setRefreshToken(response.data.refresh_token);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('api_login_success', JSON.stringify({ 
+        hasToken: !!this.getToken(), 
+        timestamp: new Date().toISOString() 
+      }));
+    }
+    console.log('[API] Tokens set, token exists:', !!this.getToken());
     return response.data;
   }
 

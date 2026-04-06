@@ -119,8 +119,12 @@ export interface WorkoutListResponse {
 }
 
 export interface SyncResponse {
-  synced_count: number;
-  workout_ids: number[];
+  /** Backend returns workouts_synced; synced_count is the normalised alias used in the frontend. */
+  workouts_synced?: number;
+  synced_count?: number;
+  workout_ids?: number[];
+  activity_ids?: number[];
+  message?: string;
 }
 
 // ============================================================================

@@ -54,11 +54,13 @@ export function useAutoSync(forceOnMount: boolean = true) {
             // Update last sync time
             localStorage.setItem(STORAGE_KEY, new Date().toISOString());
 
-            if (result.synced_count > 0) {
-                console.log(`[AutoSync] Successfully synced ${result.synced_count} workouts`);
+            // Backend returns workouts_synced; fall back to synced_count for compatibility
+            const count = result.workouts_synced ?? result.synced_count ?? 0;
 
+            if (count > 0) {
+                console.log(`[AutoSync] Successfully synced ${count} workouts`);
                 window.dispatchEvent(new CustomEvent('garmin-sync-complete', {
-                    detail: { count: result.synced_count }
+                    detail: { count }
                 }));
             } else {
                 console.log('[AutoSync] No new workouts to sync');
@@ -112,17 +114,30 @@ export async function manualSync(): Promise<{ success: boolean; count: number; m
         // Update last sync time
         localStorage.setItem(STORAGE_KEY, new Date().toISOString());
 
+        const count = result.workouts_synced ?? result.synced_count ?? 0;
+
         return {
             success: true,
-            count: result.synced_count,
-            message: `¡Sincronización exitosa! ${result.synced_count} entrenamientos nuevos.`
+            count,
+            message: count > 0
+                ? `Sync complete! ${count} new workout${count === 1 ? '' : 's'} imported.`
+                : 'Sync complete. No new workouts since last sync.',
         };
     } catch (error: any) {
-        return {
-            success: false,
-            count: 0,
-            message: error.response?.data?.detail || 'Error al sincronizar'
-        };
+        const status: number | undefined = error.response?.status;
+        const detail: string | undefined = error.response?.data?.detail;
+
+        let message = detail || error.message || 'Sync failed. Check your connection and try again.';
+
+        if (status === 429) {
+            message = 'Garmin is rate-limiting requests. Wait a few minutes and try again.';
+        } else if (status === 401) {
+            message = 'Invalid Garmin credentials. Reconnect your account in the Garmin tab.';
+        } else if (status === 400 && !detail) {
+            message = 'Garmin account not connected. Connect your account first.';
+        }
+
+        return { success: false, count: 0, message };
     }
 }
 
@@ -148,7 +163,7 @@ export function formatTimeSinceSync(): string {
     const lastSync = getLastSyncTime();
 
     if (!lastSync) {
-        return 'Nunca sincronizado';
+        return 'Never synced';
     }
 
     const now = Date.now();
@@ -159,12 +174,12 @@ export function formatTimeSinceSync(): string {
     const days = Math.floor(diff / (24 * 60 * 60 * 1000));
 
     if (minutes < 1) {
-        return 'Justo ahora';
+        return 'Just now';
     } else if (minutes < 60) {
-        return `Hace ${minutes}min`;
+        return `${minutes}min ago`;
     } else if (hours < 24) {
-        return `Hace ${hours}h`;
+        return `${hours}h ago`;
     } else {
-        return `Hace ${days}d`;
+        return `${days}d ago`;
     }
 }

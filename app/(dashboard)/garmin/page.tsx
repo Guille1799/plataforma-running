@@ -47,12 +47,20 @@ export default function GarminPage() {
 
     try {
       await apiClient.connectGarmin({ email, password });
-      setSuccess('¡Conectado exitosamente! Ahora puedes sincronizar tus entrenamientos.');
+      setSuccess('Connected successfully! You can now sync your workouts.');
       setEmail('');
       setPassword('');
     } catch (err: any) {
       console.error('Error connecting Garmin:', err);
-      setError(err.response?.data?.detail || 'Error al conectar con Garmin');
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail;
+      if (status === 429) {
+        setError('Garmin is rate-limiting. Wait a few minutes and try again.');
+      } else if (status === 401) {
+        setError('Wrong email or password for Garmin Connect.');
+      } else {
+        setError(detail || 'Failed to connect Garmin. Check your credentials.');
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -81,7 +89,7 @@ export default function GarminPage() {
       }
     } catch (err: any) {
       console.error('Error syncing Garmin:', err);
-      setError('Error al sincronizar. ¿Ya conectaste tu cuenta?');
+      setError('Sync failed. Make sure your Garmin account is connected.');
     } finally {
       setIsSyncing(false);
     }
@@ -126,10 +134,10 @@ export default function GarminPage() {
         {/* Header */}
         <div>
           <h1 className="text-4xl font-bold text-white mb-2">
-            Integraciones 🔗
+            Integrations 🔗
           </h1>
           <p className="text-slate-400">
-            Conecta tus dispositivos y servicios favoritos
+            Connect your devices and favourite services
           </p>
         </div>
 
@@ -174,33 +182,33 @@ export default function GarminPage() {
             {/* Info Card */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
-                <CardTitle className="text-white">¿Cómo funciona?</CardTitle>
+                <CardTitle className="text-white">How it works</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-slate-300">
                 <div className="flex items-start space-x-3">
                   <span className="text-2xl">1️⃣</span>
                   <div>
-                    <p className="font-semibold">Conecta tu cuenta</p>
+                    <p className="font-semibold">Connect your account</p>
                     <p className="text-sm text-slate-400">
-                      Ingresa tus credenciales de Garmin Connect para autorizar el acceso
+                      Enter your Garmin Connect credentials to authorise access
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <span className="text-2xl">2️⃣</span>
                   <div>
-                    <p className="font-semibold">Sincroniza entrenamientos</p>
+                    <p className="font-semibold">Sync workouts</p>
                     <p className="text-sm text-slate-400">
-                      Importa automáticamente todos tus entrenamientos recientes
+                      Automatically import all your recent training sessions
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <span className="text-2xl">3️⃣</span>
                   <div>
-                    <p className="font-semibold">Analiza con IA</p>
+                    <p className="font-semibold">Analyse with AI</p>
                     <p className="text-sm text-slate-400">
-                      Obtén insights personalizados y planes de entrenamiento
+                      Get personalised insights and adaptive training plans
                     </p>
                   </div>
                 </div>
@@ -210,18 +218,18 @@ export default function GarminPage() {
             {/* Connect Form */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
-                <CardTitle className="text-white">Conectar Cuenta de Garmin</CardTitle>
+                <CardTitle className="text-white">Connect Garmin Account</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleConnect} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-slate-200">
-                      Email de Garmin
+                      Garmin email
                     </Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="tu@email.com"
+                      placeholder="you@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -231,7 +239,7 @@ export default function GarminPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="password" className="text-slate-200">
-                      Contraseña de Garmin
+                      Garmin password
                     </Label>
                     <Input
                       id="password"
@@ -245,7 +253,7 @@ export default function GarminPage() {
 
                   <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3">
                     <p className="text-sm text-blue-200">
-                      🔒 Tus credenciales están seguras. Usamos garth para autenticación segura.
+                      🔒 Your credentials are secure. We use garth for safe OAuth authentication.
                     </p>
                   </div>
 
@@ -254,7 +262,7 @@ export default function GarminPage() {
                     disabled={isConnecting}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
-                    {isConnecting ? 'Conectando...' : '🔗 Conectar Garmin'}
+                    {isConnecting ? 'Connecting...' : '🔗 Connect Garmin'}
                   </Button>
                 </form>
               </CardContent>
@@ -264,10 +272,10 @@ export default function GarminPage() {
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader>
                 <CardTitle className="text-white flex items-center justify-between">
-                  <span>Sincronizar Entrenamientos</span>
+                  <span>Sync Workouts</span>
                   {lastSyncTime && (
                     <span className="text-sm font-normal text-slate-400">
-                      Última sincronización: {lastSyncTime}
+                      Last sync: {lastSyncTime}
                     </span>
                   )}
                 </CardTitle>
@@ -275,18 +283,18 @@ export default function GarminPage() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <p className="text-slate-300">
-                    Una vez conectado, sincroniza tus entrenamientos de Garmin Connect.
+                    Once connected, sync your workouts from Garmin Connect.
                   </p>
                   <div className="bg-blue-900/30 border border-blue-700/50 rounded-lg p-3 text-sm text-blue-200">
-                    <p className="font-semibold mb-1">🔄 Sincronización automática activa</p>
+                    <p className="font-semibold mb-1">🔄 Auto-sync active</p>
                     <p className="text-xs">
-                      Tus entrenamientos se sincronizan automáticamente cada 6 horas cuando abres la app.
-                      También puedes sincronizar manualmente cuando quieras.
+                      Workouts sync automatically every 6 hours when you open the app.
+                      You can also sync manually any time.
                     </p>
                   </div>
                   <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 text-sm text-slate-300">
-                    <p><strong>Primera sincronización:</strong> Importa 2 años de entrenamientos y métricas de salud</p>
-                    <p><strong>Siguientes:</strong> Solo nuevos datos desde la última sincronización</p>
+                    <p><strong>First sync:</strong> Imports up to 2 years of workouts and health metrics</p>
+                    <p><strong>Subsequent syncs:</strong> Only new data since the last sync</p>
                   </div>
                 </div>
 
@@ -298,10 +306,10 @@ export default function GarminPage() {
                   {isSyncing ? (
                     <span className="flex items-center justify-center gap-2">
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Sincronizando...
+                      Syncing...
                     </span>
                   ) : (
-                    '🔄 Sincronizar Ahora'
+                    '🔄 Sync Now'
                   )}
                 </Button>
               </CardContent>
@@ -311,9 +319,9 @@ export default function GarminPage() {
             <Card className="bg-slate-800/50 border-slate-700">
               <CardContent className="p-6">
                 <p className="text-sm text-slate-400">
-                  <strong className="text-slate-300">💡 Nota:</strong> Si tienes problemas,
-                  asegúrate de que tus credenciales de Garmin sean correctas y que tu cuenta
-                  esté activa. La sincronización puede tardar unos segundos.
+                  <strong className="text-slate-300">💡 Note:</strong> If you have trouble syncing,
+                  make sure your Garmin credentials are correct and your account is active.
+                  The first sync may take up to a minute.
                 </p>
               </CardContent>
             </Card>
