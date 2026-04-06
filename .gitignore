@@ -3,6 +3,7 @@
 .env
 .env.*
 !.env.example
+demo-account.env
 
 # --- Python (para el backend/) ---
 __pycache__/
