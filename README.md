@@ -1,7 +1,10 @@
 # RunCoach AI - Intelligent Running Platform
 
+**Repository:** [github.com/Guille1799/plataforma-running](https://github.com/Guille1799/plataforma-running)  
+**Live (demo / evolving):** [plataforma-running.vercel.app](https://plataforma-running.vercel.app)
+
 RunCoach AI is a full-stack application that turns workout and health data into actionable training decisions:
-session analysis, personalized plans, and adaptive coaching guidance.
+session analysis, personalized plans, and adaptive coaching guidance. It links **Garmin** and **Strava** to a **FastAPI** + **PostgreSQL** backend and **LLM**-assisted planning (**Groq**, Llama 3.3)—useful as a portfolio example of **behaviour change** tooling grounded in real activity data, not generic chat.
 
 ## How It Works (First)
 
