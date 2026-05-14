@@ -1,8 +1,8 @@
 # 🟢 Estado de Producción - RunCoach AI
 
-**Última actualización:** 2026-05-14 16:38:52 UTC
-**Commit:** `c07acb7`
-**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/25872427255)
+**Última actualización:** 2026-05-14 17:33:53 UTC
+**Commit:** `c8d9454`
+**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/25875188074)
 
 ---
 
@@ -18,8 +18,8 @@
 - **Health Check:** https://plataforma-running.vercel.app
 - **Estado:** `healthy`
 - **Status Code:** `200`
-- **Response Time:** `885.07ms`
-- **Timestamp:** 2026-05-14T16:38:36.081021
+- **Response Time:** `685.38ms`
+- **Timestamp:** 2026-05-14T17:33:36.660961
 
 #### ❌ Backend API (Render)
 
@@ -27,7 +27,7 @@
 - **Health Check:** https://plataforma-running.onrender.com/health
 - **Estado:** `timeout`
 - **Error:** `Timeout después de 15 segundos`
-- **Timestamp:** 2026-05-14T16:38:37.746252
+- **Timestamp:** 2026-05-14T17:33:38.256661
 
 ---
 
@@ -41,9 +41,9 @@
     "health_endpoint": "https://plataforma-running.vercel.app",
     "status": "healthy",
     "status_code": 200,
-    "response_time_ms": 885.07,
+    "response_time_ms": 685.38,
     "error": null,
-    "timestamp": "2026-05-14T16:38:36.081021",
+    "timestamp": "2026-05-14T17:33:36.660961",
     "healthy": true
   },
   {
@@ -54,7 +54,7 @@
     "status_code": null,
     "response_time_ms": null,
     "error": "Timeout después de 15 segundos",
-    "timestamp": "2026-05-14T16:38:37.746252",
+    "timestamp": "2026-05-14T17:33:38.256661",
     "healthy": false
   }
 ]
