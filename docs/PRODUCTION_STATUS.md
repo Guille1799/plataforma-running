@@ -1,14 +1,14 @@
 # 🟢 Estado de Producción - RunCoach AI
 
-**Última actualización:** 2026-06-09 07:11:15 UTC
-**Commit:** `a3b12a7`
-**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/27190002052)
+**Última actualización:** 2026-06-09 09:05:30 UTC
+**Commit:** `2821deb`
+**Workflow:** [Ver en GitHub Actions](https://github.com/Guille1799/plataforma-running/actions/runs/27195685762)
 
 ---
 
 ## 📊 Resumen
 
-⚠️ **Algunos servicios tienen problemas** (1/2 operativos)
+✅ **Todos los servicios están operativos** (2/2)
 
 ### Servicios Monitoreados
 
@@ -18,16 +18,17 @@
 - **Health Check:** https://plataforma-running.vercel.app
 - **Estado:** `healthy`
 - **Status Code:** `200`
-- **Response Time:** `511.08ms`
-- **Timestamp:** 2026-06-09T07:10:59.062355
+- **Response Time:** `441.19ms`
+- **Timestamp:** 2026-06-09T09:05:29.861232
 
-#### ❌ Backend API (Render)
+#### ✅ Backend API (Render)
 
 - **URL:** https://plataforma-running.onrender.com
 - **Health Check:** https://plataforma-running.onrender.com/health
-- **Estado:** `timeout`
-- **Error:** `Timeout después de 15 segundos`
-- **Timestamp:** 2026-06-09T07:11:00.405506
+- **Estado:** `healthy`
+- **Status Code:** `200`
+- **Response Time:** `202.58ms`
+- **Timestamp:** 2026-06-09T09:05:30.786990
 
 ---
 
@@ -41,21 +42,21 @@
     "health_endpoint": "https://plataforma-running.vercel.app",
     "status": "healthy",
     "status_code": 200,
-    "response_time_ms": 511.08,
+    "response_time_ms": 441.19,
     "error": null,
-    "timestamp": "2026-06-09T07:10:59.062355",
+    "timestamp": "2026-06-09T09:05:29.861232",
     "healthy": true
   },
   {
     "name": "Backend API (Render)",
     "url": "https://plataforma-running.onrender.com",
     "health_endpoint": "https://plataforma-running.onrender.com/health",
-    "status": "timeout",
-    "status_code": null,
-    "response_time_ms": null,
-    "error": "Timeout después de 15 segundos",
-    "timestamp": "2026-06-09T07:11:00.405506",
-    "healthy": false
+    "status": "healthy",
+    "status_code": 200,
+    "response_time_ms": 202.58,
+    "error": null,
+    "timestamp": "2026-06-09T09:05:30.786990",
+    "healthy": true
   }
 ]
 ```
